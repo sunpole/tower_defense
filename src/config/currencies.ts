@@ -1,4 +1,4 @@
-import { ICurrency, IExchangeRate } from '../types/Currency';
+import type { ICurrency, IExchangeRate } from '../types/Currency';
 
 export const CURRENCIES: ICurrency[] = [
     { id: 1, name: 'Яшма', color: '#ff7b7b', symbol: '🔴', description: 'Красный камень' },
