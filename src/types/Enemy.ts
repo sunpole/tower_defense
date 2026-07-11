@@ -19,5 +19,5 @@ export interface IPlacedEnemy extends IEnemy {
     y: number;
     hp: number;                // текущее здоровье
     targetNodeIndex: number;   // индекс текущей целевой точки в пути
-    id: string;                // уникальный идентификатор для пуль
+    instanceId: string;        // уникальный идентификатор экземпляра для пуль
 }

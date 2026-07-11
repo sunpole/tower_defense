@@ -1,4 +1,4 @@
-import { ITower, AttackType } from '../types/Tower';
+import type { ITower } from '../types/Tower';
 
 export const TOWERS: ITower[] = [
     {

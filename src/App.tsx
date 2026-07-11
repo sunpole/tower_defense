@@ -1,4 +1,3 @@
-import React from 'react';
 import { Shop } from './components/Shop';
 import './App.css';
 
