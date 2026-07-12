@@ -4,7 +4,7 @@ import {
   useMemo,
   useReducer,
   useRef,
-  useState,
+  useSyncExternalStore,
 } from 'react';
 import {
   balanceLabReducer,
@@ -12,9 +12,9 @@ import {
 } from '../game/balanceLab';
 import {
   buildSessionSummary,
-  loadBalanceProfile,
+  getBalanceProfileSnapshot,
   recordBalanceSession,
-  type BalanceSessionSummary,
+  subscribeBalanceProfile,
 } from '../game/gameStats';
 import { useBattleLoop } from '../hooks/useBattleLoop';
 import type { BattleDispatch } from '../types/Battle';
@@ -33,8 +33,11 @@ export function Battle() {
     balanceLabReducer,
     createBalanceInitialState(),
   );
-  const [profile, setProfile] = useState(loadBalanceProfile);
-  const [summary, setSummary] = useState<BalanceSessionSummary | null>(null);
+  const profile = useSyncExternalStore(
+    subscribeBalanceProfile,
+    getBalanceProfileSnapshot,
+    getBalanceProfileSnapshot,
+  );
   const recordedSessionRef = useRef<string | null>(null);
   const debugMode = useMemo(
     () => new URLSearchParams(window.location.search).get('debug') === '1',
@@ -42,28 +45,20 @@ export function Battle() {
   );
   const dispatch = useCallback<BattleDispatch>(
     (action) => balanceDispatch(action),
-    [],
+    [balanceDispatch],
   );
+  const summary = useMemo(() => {
+    const isFinished = state.status === 'victory' || state.status === 'defeat';
+    return isFinished ? buildSessionSummary(state) : null;
+  }, [state]);
 
   useBattleLoop(balanceDispatch);
 
   useEffect(() => {
-    const isFinished = state.status === 'victory' || state.status === 'defeat';
-
-    if (!isFinished) {
-      if (summary && summary.sessionId !== state.sessionId) {
-        setSummary(null);
-      }
-      return;
-    }
-
-    if (recordedSessionRef.current === state.sessionId) return;
-
-    const nextSummary = buildSessionSummary(state);
-    recordedSessionRef.current = state.sessionId;
-    setSummary(nextSummary);
-    setProfile(recordBalanceSession(nextSummary));
-  }, [state, summary]);
+    if (!summary || recordedSessionRef.current === summary.sessionId) return;
+    recordedSessionRef.current = summary.sessionId;
+    recordBalanceSession(summary);
+  }, [summary]);
 
   const selectedPlacedTower = state.towers.find(
     (tower) => tower.instanceId === state.selectedPlacedTowerId,
