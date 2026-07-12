@@ -1,9 +1,9 @@
 import {
-  BATTLE_PATH,
   SPAWN_INTERVAL_MS,
   STARTING_BASE_HEALTH,
   STARTING_ENERGY,
   TOTAL_WAVES,
+  type GridPoint,
 } from '../config/gameSettings';
 import { TOWERS } from '../config/towers';
 import type {
@@ -13,7 +13,7 @@ import type {
   BattleState,
   BattleTower,
 } from '../types/Battle';
-import { getDistance, getPathPosition, PATH_CELL_KEYS } from './battleGeometry';
+import { getDistance, getPathPosition } from './battleGeometry';
 import { createEnemy } from './createEnemy';
 import {
   canFuseTowers,
@@ -21,6 +21,7 @@ import {
   fuseTowers,
   getFusionCost,
 } from './fusionLogic';
+import { generateBattleRoute } from './routeGeneration';
 import { getWaveEnemyCount, getWavePlan } from './waveBalance';
 
 let towerSequence = 0;
@@ -28,7 +29,10 @@ let effectSequence = 0;
 
 export function createInitialBattleState(
   selectedTowerId = TOWERS[0]?.id ?? 1,
+  routeSeed?: number,
 ): BattleState {
+  const route = generateBattleRoute(routeSeed);
+
   return {
     selectedTowerId,
     placingTowerId: null,
@@ -38,6 +42,14 @@ export function createInitialBattleState(
     towers: [],
     enemies: [],
     effects: [],
+    route: route.points,
+    routeSeed: route.seed,
+    routeLength: route.length,
+    routeTurns: route.turns,
+    routeKind: route.kind,
+    routeLabel: route.label,
+    routeThreatMultiplier: route.threatMultiplier,
+    routeRewardMultiplier: route.rewardMultiplier,
     energy: STARTING_ENERGY,
     baseHealth: STARTING_BASE_HEALTH,
     wave: 0,
@@ -45,7 +57,7 @@ export function createInitialBattleState(
     spawnRemaining: 0,
     spawnCooldown: 0,
     kills: 0,
-    message: 'Нажмите на тип башни, затем на свободную клетку. Башни развиваются через слияние цветов.',
+    message: `${route.label}: ${route.length} клеток, поворотов ${route.turns}. Выберите башню и подготовьте защиту.`,
   };
 }
 
@@ -57,9 +69,18 @@ function applyDamage(target: BattleEnemy, damage: number) {
   target.hp -= damage;
 }
 
-function getTowerTargets(tower: BattleTower, enemies: BattleEnemy[], canIgnoreRange: boolean) {
+function getTowerTargets(
+  tower: BattleTower,
+  enemies: BattleEnemy[],
+  canIgnoreRange: boolean,
+  path: readonly GridPoint[],
+) {
   return enemies
-    .filter((enemy) => enemy.hp > 0 && (canIgnoreRange || getDistance(tower, enemy) <= tower.range))
+    .filter(
+      (enemy) =>
+        enemy.hp > 0 &&
+        (canIgnoreRange || getDistance(tower, enemy, path) <= tower.range),
+    )
     .sort((left, right) => right.progress - left.progress);
 }
 
@@ -72,9 +93,10 @@ function createLineEffect(
   tower: BattleTower,
   target: BattleEnemy,
   kind: 'projectile' | 'laser',
+  path: readonly GridPoint[],
   label?: string,
 ): BattleEffect {
-  const position = getPathPosition(target.progress);
+  const position = getPathPosition(target.progress, path);
 
   return {
     id: nextEffectId(),
@@ -134,12 +156,13 @@ function getAbilityLabel(
 function attackWithTower(
   tower: BattleTower,
   enemies: BattleEnemy[],
+  path: readonly GridPoint[],
 ): { tower: BattleTower; effects: BattleEffect[] } {
   const canIgnoreRange =
     tower.ignoresRangeEvery > 0 &&
     tower.attackCounter > 0 &&
     tower.attackCounter % tower.ignoresRangeEvery === 0;
-  const targets = getTowerTargets(tower, enemies, canIgnoreRange);
+  const targets = getTowerTargets(tower, enemies, canIgnoreRange, path);
 
   if (targets.length === 0) {
     return { tower, effects: [] };
@@ -157,7 +180,7 @@ function attackWithTower(
   selectedTargets.forEach((target, index) => {
     let damage = nextTower.damage;
 
-    if (index > 0) {
+    if (index > 0 && nextTower.attackType !== 'aura') {
       damage *= abilityIds.has('blue-8-chain') ? 0.55 : 0.42;
     }
 
@@ -177,7 +200,9 @@ function attackWithTower(
   }
 
   if (abilityIds.has('green-7-burst') && nextTower.attackCounter % 6 === 0) {
-    selectedTargets.slice(0, 3).forEach((target) => applyDamage(target, Math.round(nextTower.damage * 0.45)));
+    selectedTargets
+      .slice(0, 3)
+      .forEach((target) => applyDamage(target, Math.round(nextTower.damage * 0.45)));
   }
 
   const resetChance = abilityIds.has('green-8-reset') ? 0.22 : 0;
@@ -190,14 +215,24 @@ function attackWithTower(
   } else {
     const effectKind = nextTower.attackType === 'laser' ? 'laser' : 'projectile';
     selectedTargets.forEach((target, index) => {
-      effects.push(createLineEffect(nextTower, target, effectKind, index === 0 ? abilityLabel : undefined));
+      effects.push(
+        createLineEffect(
+          nextTower,
+          target,
+          effectKind,
+          path,
+          index === 0 ? abilityLabel : undefined,
+        ),
+      );
     });
   }
 
   return {
     tower: {
       ...nextTower,
-      cooldownRemaining: isReset ? Math.round(nextTower.cooldown * 0.22) : nextTower.cooldown,
+      cooldownRemaining: isReset
+        ? Math.round(nextTower.cooldown * 0.22)
+        : nextTower.cooldown,
     },
     effects,
   };
@@ -228,9 +263,7 @@ export function battleReducer(
         (candidate) => candidate.instanceId === action.instanceId,
       );
 
-      if (!tower) {
-        return state;
-      }
+      if (!tower) return state;
 
       return {
         ...state,
@@ -250,17 +283,19 @@ export function battleReducer(
       };
 
     case 'PLACE_TOWER': {
-      if (state.status === 'victory' || state.status === 'defeat') {
-        return state;
-      }
+      if (state.status === 'victory' || state.status === 'defeat') return state;
 
-      const occupiedTower = state.towers.find((tower) => tower.x === action.x && tower.y === action.y);
+      const occupiedTower = state.towers.find(
+        (tower) => tower.x === action.x && tower.y === action.y,
+      );
 
       if (occupiedTower) {
         return battleReducer(state, {
-          type: state.fusionSourceTowerId && state.fusionSourceTowerId !== occupiedTower.instanceId
-            ? 'FUSE_WITH_TOWER'
-            : 'SELECT_PLACED_TOWER',
+          type:
+            state.fusionSourceTowerId &&
+            state.fusionSourceTowerId !== occupiedTower.instanceId
+              ? 'FUSE_WITH_TOWER'
+              : 'SELECT_PLACED_TOWER',
           instanceId: occupiedTower.instanceId,
         } as BattleAction);
       }
@@ -274,7 +309,7 @@ export function battleReducer(
         };
       }
 
-      if (PATH_CELL_KEYS.has(`${action.x}:${action.y}`)) {
+      if (state.route.some((point) => point.x === action.x && point.y === action.y)) {
         return { ...state, message: 'На дороге башню ставить нельзя.' };
       }
 
@@ -287,12 +322,20 @@ export function battleReducer(
       }
 
       if (state.energy < towerTemplate.placeCost) {
-        return { ...state, message: `Недостаточно энергии: нужно ${towerTemplate.placeCost}, доступно ${state.energy}.` };
+        return {
+          ...state,
+          message: `Недостаточно энергии: нужно ${towerTemplate.placeCost}, доступно ${state.energy}.`,
+        };
       }
 
       towerSequence += 1;
       const instanceId = `tower-${towerSequence}`;
-      const tower = createBaseBattleTower(towerTemplate, instanceId, action.x, action.y);
+      const tower = createBaseBattleTower(
+        towerTemplate,
+        instanceId,
+        action.x,
+        action.y,
+      );
 
       return {
         ...state,
@@ -328,8 +371,12 @@ export function battleReducer(
       };
 
     case 'FUSE_WITH_TOWER': {
-      const source = state.towers.find((tower) => tower.instanceId === state.fusionSourceTowerId);
-      const target = state.towers.find((tower) => tower.instanceId === action.instanceId);
+      const source = state.towers.find(
+        (tower) => tower.instanceId === state.fusionSourceTowerId,
+      );
+      const target = state.towers.find(
+        (tower) => tower.instanceId === action.instanceId,
+      );
 
       if (!source || !target) {
         return { ...state, message: 'Для слияния нужны две выбранные башни.' };
@@ -362,14 +409,21 @@ export function battleReducer(
       return {
         ...state,
         towers: state.towers
-          .filter((tower) => tower.instanceId !== source.instanceId && tower.instanceId !== target.instanceId)
+          .filter(
+            (tower) =>
+              tower.instanceId !== source.instanceId &&
+              tower.instanceId !== target.instanceId,
+          )
           .concat(fusedTower),
         selectedPlacedTowerId: fusedTower.instanceId,
         fusionSourceTowerId: null,
         energy: state.energy - fusionCost,
         effects: [
           ...state.effects,
-          createAuraEffect(fusedTower, `${fusedTower.name} · ${fusedTower.fusionRarity}`),
+          createAuraEffect(
+            fusedTower,
+            `${fusedTower.name} · ${fusedTower.fusionRarity}`,
+          ),
         ].slice(-36),
         message: `Слияние завершено: ${fusedTower.name}.`,
       };
@@ -386,7 +440,9 @@ export function battleReducer(
 
       return {
         ...state,
-        towers: state.towers.filter((tower) => tower.instanceId !== selectedTower.instanceId),
+        towers: state.towers.filter(
+          (tower) => tower.instanceId !== selectedTower.instanceId,
+        ),
         selectedPlacedTowerId: null,
         fusionSourceTowerId: null,
         energy: state.energy + refund,
@@ -401,9 +457,7 @@ export function battleReducer(
       };
 
     case 'START_WAVE': {
-      if (state.status === 'running' || state.wave >= TOTAL_WAVES) {
-        return state;
-      }
+      if (state.status === 'running' || state.wave >= TOTAL_WAVES) return state;
 
       const nextWave = state.wave + 1;
       const plan = getWavePlan(nextWave);
@@ -425,7 +479,9 @@ export function battleReducer(
         .filter((effect) => effect.ttl > 0);
 
       if (state.status !== 'running') {
-        return effects.length === state.effects.length ? state : { ...state, effects };
+        return effects.length === state.effects.length
+          ? state
+          : { ...state, effects };
       }
 
       let spawnRemaining = state.spawnRemaining;
@@ -436,7 +492,14 @@ export function battleReducer(
 
       if (spawnRemaining > 0 && spawnCooldown <= 0) {
         const spawnIndex = waveEnemyCount - spawnRemaining;
-        enemies.push(createEnemy(state.wave, spawnIndex));
+        enemies.push(
+          createEnemy(
+            state.wave,
+            spawnIndex,
+            state.routeThreatMultiplier,
+            state.routeRewardMultiplier,
+          ),
+        );
         spawnRemaining -= 1;
         spawnCooldown += SPAWN_INTERVAL_MS;
       }
@@ -449,10 +512,8 @@ export function battleReducer(
           progress: enemy.progress + enemy.speed * (action.delta / 1000),
         }))
         .filter((enemy) => {
-          const escaped = enemy.progress >= BATTLE_PATH.length - 1;
-          if (escaped) {
-            escapedDamage += enemy.baseDamage;
-          }
+          const escaped = enemy.progress >= state.route.length - 1;
+          if (escaped) escapedDamage += enemy.baseDamage;
           return !escaped;
         });
 
@@ -473,7 +534,10 @@ export function battleReducer(
 
       const cooledTowers = state.towers.map((tower) => ({
         ...tower,
-        cooldownRemaining: Math.max(0, tower.cooldownRemaining - action.delta),
+        cooldownRemaining: Math.max(
+          0,
+          tower.cooldownRemaining - action.delta,
+        ),
       }));
       const attackedTowers: BattleTower[] = [];
 
@@ -483,7 +547,7 @@ export function battleReducer(
           continue;
         }
 
-        const result = attackWithTower(tower, enemies);
+        const result = attackWithTower(tower, enemies, state.route);
         attackedTowers.push(result.tower);
         effects.push(...result.effects);
       }
@@ -516,7 +580,7 @@ export function battleReducer(
             spawnCooldown,
             kills,
             status: 'victory',
-            message: `Победа! Пройдено волн: ${TOTAL_WAVES}.`,
+            message: `Победа! Пройдено волн: ${TOTAL_WAVES}. Карта ${state.routeSeed}.`,
           };
         }
 

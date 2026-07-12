@@ -9,7 +9,7 @@ export function BattleHeader({ state }: BattleHeaderProps) {
   return (
     <header className="game-header">
       <div>
-        <p className="eyebrow">Tower Defense · первый игровой цикл</p>
+        <p className="eyebrow">Цветовой Завет · Живой маршрут</p>
         <h1>Защита пути</h1>
       </div>
 
@@ -17,7 +17,7 @@ export function BattleHeader({ state }: BattleHeaderProps) {
         <div><span>Энергия</span><strong>{state.energy}</strong></div>
         <div><span>База</span><strong>{state.baseHealth}</strong></div>
         <div><span>Волна</span><strong>{state.wave}/{TOTAL_WAVES}</strong></div>
-        <div><span>Победы</span><strong>{state.kills}</strong></div>
+        <div><span>Уничтожено</span><strong>{state.kills}</strong></div>
       </div>
     </header>
   );

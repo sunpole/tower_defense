@@ -1,9 +1,13 @@
-export type EnemyArchetypeId = 'normal' | 'swift' | 'brute' | 'elite';
+import type { EnemyArchetypeId } from '../types/Battle';
+
+export type WaveThreat = 'Низкая' | 'Средняя' | 'Высокая' | 'Критическая';
+export type BossWaveKind = 'none' | 'mini' | 'boss';
 
 export interface WavePlan {
   wave: number;
   label: string;
-  threat: 'Низкая' | 'Средняя' | 'Высокая' | 'Критическая';
+  threat: WaveThreat;
+  bossKind: BossWaveKind;
   hpMultiplier: number;
   speedMultiplier: number;
   rewardMultiplier: number;
@@ -11,113 +15,85 @@ export interface WavePlan {
   counts: Record<EnemyArchetypeId, number>;
 }
 
-const WAVE_PLANS: WavePlan[] = [
-  {
-    wave: 1,
-    label: 'Разведка',
-    threat: 'Низкая',
-    hpMultiplier: 1,
-    speedMultiplier: 1,
-    rewardMultiplier: 1,
-    completionBonus: 15,
-    counts: { normal: 6, swift: 0, brute: 0, elite: 0 },
-  },
-  {
-    wave: 2,
-    label: 'Первый натиск',
-    threat: 'Средняя',
-    hpMultiplier: 1.1,
-    speedMultiplier: 1.02,
-    rewardMultiplier: 1.03,
-    completionBonus: 15,
-    counts: { normal: 6, swift: 2, brute: 0, elite: 0 },
-  },
-  {
-    wave: 3,
-    label: 'Тяжёлый след',
-    threat: 'Средняя',
-    hpMultiplier: 1.25,
-    speedMultiplier: 1.04,
-    rewardMultiplier: 1.06,
-    completionBonus: 16,
-    counts: { normal: 7, swift: 2, brute: 1, elite: 0 },
-  },
-  {
-    wave: 4,
-    label: 'Разделённый строй',
-    threat: 'Высокая',
-    hpMultiplier: 1.45,
-    speedMultiplier: 1.06,
-    rewardMultiplier: 1.09,
-    completionBonus: 17,
-    counts: { normal: 7, swift: 3, brute: 2, elite: 0 },
-  },
-  {
-    wave: 5,
-    label: 'Первый страж',
-    threat: 'Высокая',
-    hpMultiplier: 1.7,
-    speedMultiplier: 1.08,
-    rewardMultiplier: 1.12,
-    completionBonus: 18,
-    counts: { normal: 8, swift: 3, brute: 2, elite: 1 },
-  },
-  {
-    wave: 6,
-    label: 'Давление',
-    threat: 'Высокая',
-    hpMultiplier: 2,
-    speedMultiplier: 1.1,
-    rewardMultiplier: 1.15,
-    completionBonus: 19,
-    counts: { normal: 8, swift: 4, brute: 3, elite: 1 },
-  },
-  {
-    wave: 7,
-    label: 'Ломающий строй',
-    threat: 'Высокая',
-    hpMultiplier: 2.35,
-    speedMultiplier: 1.12,
-    rewardMultiplier: 1.18,
-    completionBonus: 20,
-    counts: { normal: 9, swift: 4, brute: 4, elite: 1 },
-  },
-  {
-    wave: 8,
-    label: 'Двойная угроза',
-    threat: 'Критическая',
-    hpMultiplier: 2.75,
-    speedMultiplier: 1.14,
-    rewardMultiplier: 1.21,
-    completionBonus: 21,
-    counts: { normal: 9, swift: 5, brute: 4, elite: 2 },
-  },
-  {
-    wave: 9,
-    label: 'Последний рубеж',
-    threat: 'Критическая',
-    hpMultiplier: 3.2,
-    speedMultiplier: 1.16,
-    rewardMultiplier: 1.24,
-    completionBonus: 22,
-    counts: { normal: 10, swift: 5, brute: 5, elite: 2 },
-  },
-  {
-    wave: 10,
-    label: 'Цветовой шторм',
-    threat: 'Критическая',
-    hpMultiplier: 3.75,
-    speedMultiplier: 1.18,
-    rewardMultiplier: 1.27,
-    completionBonus: 0,
-    counts: { normal: 10, swift: 6, brute: 6, elite: 2 },
-  },
+const REGULAR_LABELS = [
+  'Разведка',
+  'Быстрый след',
+  'Тяжёлый строй',
+  'Разделённый натиск',
+  'Давление разлома',
+  'Смешанная орда',
+  'Ломающий строй',
+  'Двойная угроза',
 ];
 
-const ARCHETYPE_ORDER: EnemyArchetypeId[] = ['normal', 'swift', 'normal', 'brute', 'normal', 'elite'];
+const ARCHETYPE_ORDER: EnemyArchetypeId[] = [
+  'normal',
+  'swift',
+  'normal',
+  'brute',
+  'normal',
+  'elite',
+];
+
+function getBossKind(wave: number): BossWaveKind {
+  if (wave % 10 === 0) return 'boss';
+  if (wave % 10 === 5) return 'mini';
+  return 'none';
+}
+
+function getThreat(wave: number, bossKind: BossWaveKind): WaveThreat {
+  if (bossKind === 'boss' || wave >= 24) return 'Критическая';
+  if (bossKind === 'mini' || wave >= 14) return 'Высокая';
+  if (wave >= 5) return 'Средняя';
+  return 'Низкая';
+}
+
+function getWaveLabel(wave: number, bossKind: BossWaveKind) {
+  if (bossKind === 'boss') return `Владыка разлома · этап ${wave / 10}`;
+  if (bossKind === 'mini') return `Предвестник бездны · этап ${Math.ceil(wave / 10)}`;
+  return REGULAR_LABELS[(wave - 1) % REGULAR_LABELS.length];
+}
 
 export function getWavePlan(wave: number): WavePlan {
-  return WAVE_PLANS[Math.max(0, Math.min(WAVE_PLANS.length - 1, wave - 1))];
+  const safeWave = Math.max(1, Math.min(30, wave));
+  const bossKind = getBossKind(safeWave);
+  const chapter = Math.floor((safeWave - 1) / 5);
+  const isBossWave = bossKind !== 'none';
+
+  const counts: Record<EnemyArchetypeId, number> = {
+    normal: 5 + Math.floor(safeWave * (isBossWave ? 0.45 : 0.68)),
+    swift: safeWave >= 2 ? Math.floor((safeWave + 1) / 3) : 0,
+    brute: safeWave >= 3 ? Math.floor((safeWave + 1) / 4) : 0,
+    elite: safeWave >= 6 ? Math.floor((safeWave - 1) / 7) : 0,
+    miniBoss: bossKind === 'mini' ? 1 : 0,
+    boss: bossKind === 'boss' ? 1 : 0,
+  };
+
+  if (bossKind === 'boss') {
+    counts.swift = Math.max(2, Math.floor(counts.swift * 0.65));
+    counts.brute = Math.max(2, Math.floor(counts.brute * 0.7));
+  }
+
+  const hpMultiplier = Number((1 + (safeWave - 1) * 0.155 + chapter * 0.16).toFixed(3));
+  const speedMultiplier = Number((1 + Math.min(0.38, (safeWave - 1) * 0.012)).toFixed(3));
+  const rewardMultiplier = Number((1 + Math.min(0.82, (safeWave - 1) * 0.022)).toFixed(3));
+  const completionBonus = bossKind === 'boss'
+    ? 80 + safeWave * 3
+    : bossKind === 'mini'
+      ? 48 + safeWave * 2
+      : 14 + Math.floor(safeWave * 1.7);
+
+  return {
+    wave: safeWave,
+    label: getWaveLabel(safeWave, bossKind),
+    threat: getThreat(safeWave, bossKind),
+    bossKind,
+    hpMultiplier,
+    speedMultiplier,
+    rewardMultiplier,
+    completionBonus,
+    counts,
+  };
 }
 
 export function getWaveEnemyCount(plan: WavePlan) {
@@ -125,17 +101,28 @@ export function getWaveEnemyCount(plan: WavePlan) {
 }
 
 export function getWaveSequence(plan: WavePlan): EnemyArchetypeId[] {
-  const remaining = { ...plan.counts };
+  const remaining = {
+    normal: plan.counts.normal,
+    swift: plan.counts.swift,
+    brute: plan.counts.brute,
+    elite: plan.counts.elite,
+  };
   const sequence: EnemyArchetypeId[] = [];
 
   while (Object.values(remaining).some((count) => count > 0)) {
     for (const archetype of ARCHETYPE_ORDER) {
-      if (remaining[archetype] > 0) {
-        sequence.push(archetype);
-        remaining[archetype] -= 1;
+      if (archetype in remaining) {
+        const key = archetype as keyof typeof remaining;
+        if (remaining[key] > 0) {
+          sequence.push(archetype);
+          remaining[key] -= 1;
+        }
       }
     }
   }
+
+  if (plan.counts.miniBoss > 0) sequence.push('miniBoss');
+  if (plan.counts.boss > 0) sequence.push('boss');
 
   return sequence;
 }
@@ -146,6 +133,8 @@ export function formatWaveComposition(plan: WavePlan) {
     plan.counts.swift > 0 ? `быстрых ${plan.counts.swift}` : null,
     plan.counts.brute > 0 ? `тяжёлых ${plan.counts.brute}` : null,
     plan.counts.elite > 0 ? `стражей ${plan.counts.elite}` : null,
+    plan.counts.miniBoss > 0 ? 'мини-босс 1' : null,
+    plan.counts.boss > 0 ? 'БОЛЬШОЙ БОСС 1' : null,
   ].filter(Boolean);
 
   return parts.join(' · ');

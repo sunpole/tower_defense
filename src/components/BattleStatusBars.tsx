@@ -18,9 +18,37 @@ export function BattleStatusBars({ state }: BattleStatusBarsProps) {
     100,
     Math.max(0, (state.baseHealth / STARTING_BASE_HEALTH) * 100),
   );
+  const boss = state.enemies.find(
+    (enemy) => enemy.archetype === 'boss' || enemy.archetype === 'miniBoss',
+  );
+  const bossPercent = boss
+    ? Math.min(100, Math.max(0, (boss.hp / boss.maxHp) * 100))
+    : 0;
 
   return (
     <section className="battle-status-bars" aria-label="Состояние волны и базы">
+      {boss && (
+        <div className="battle-status-bar battle-status-bar--boss">
+          <div className="battle-status-bar__label">
+            <strong>{boss.name}</strong>
+            <span>{Math.max(0, Math.ceil(boss.hp))} / {boss.maxHp} HP</span>
+          </div>
+          <div
+            aria-label="Здоровье босса"
+            aria-valuemax={boss.maxHp}
+            aria-valuemin={0}
+            aria-valuenow={Math.max(0, Math.ceil(boss.hp))}
+            className="battle-status-bar__track battle-status-bar__track--boss"
+            role="progressbar"
+          >
+            <span
+              className="battle-status-bar__fill battle-status-bar__fill--boss"
+              style={{ width: `${bossPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="battle-status-bar">
         <div className="battle-status-bar__label">
           <strong>Волна {state.wave || '—'}</strong>

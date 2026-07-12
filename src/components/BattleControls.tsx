@@ -19,12 +19,20 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
   const plan = getWavePlan(previewWave);
   const remainingEnemies = state.enemies.length + state.spawnRemaining;
   const isFinalState = state.status === 'victory' || state.status === 'defeat';
+  const routeThreatPercent = Math.round((state.routeThreatMultiplier - 1) * 100);
+  const routeThreatLabel = routeThreatPercent === 0
+    ? 'без поправки'
+    : routeThreatPercent > 0
+      ? `+${routeThreatPercent}% HP врагов`
+      : `${routeThreatPercent}% HP врагов`;
 
   return (
     <>
       {!isFinalState && (
         <section
-          className={`wave-preview wave-preview--${plan.threat.toLowerCase()}`}
+          className={`wave-preview wave-preview--${plan.threat.toLowerCase()}${
+            plan.bossKind !== 'none' ? ' wave-preview--boss' : ''
+          }`}
           aria-label="Информация о волне"
         >
           <div>
@@ -35,6 +43,13 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
             </span>
             <strong>{plan.label}</strong>
             <small>{formatWaveComposition(plan)}</small>
+            {plan.bossKind !== 'none' && (
+              <b className={`boss-warning boss-warning--${plan.bossKind}`}>
+                {plan.bossKind === 'boss'
+                  ? 'Большой босс: 5 урона базе при прорыве'
+                  : 'Мини-босс: 3 урона базе при прорыве'}
+              </b>
+            )}
           </div>
           <dl>
             <div>
@@ -47,7 +62,7 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
             </div>
             <div>
               <dt>Здоровье</dt>
-              <dd>×{plan.hpMultiplier.toFixed(2)}</dd>
+              <dd>×{(plan.hpMultiplier * state.routeThreatMultiplier).toFixed(2)}</dd>
             </div>
             <div>
               <dt>Скорость</dt>
@@ -56,6 +71,29 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
           </dl>
         </section>
       )}
+
+      <section className="route-summary" aria-label="Параметры текущего маршрута">
+        <div>
+          <span>Карта</span>
+          <strong>{state.routeLabel}</strong>
+        </div>
+        <div>
+          <span>Длина</span>
+          <strong>{state.routeLength} клеток</strong>
+        </div>
+        <div>
+          <span>Повороты</span>
+          <strong>{state.routeTurns}</strong>
+        </div>
+        <div>
+          <span>Баланс пути</span>
+          <strong>{routeThreatLabel}</strong>
+        </div>
+        <div>
+          <span>Seed</span>
+          <strong>{state.routeSeed}</strong>
+        </div>
+      </section>
 
       <div className={`battle-message battle-message--${state.status}`}>
         {state.message}
@@ -82,7 +120,7 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
           onClick={() => dispatch({ type: 'RESET' })}
           type="button"
         >
-          Начать заново
+          Новая карта
         </button>
       </div>
     </>
