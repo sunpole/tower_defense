@@ -39,6 +39,33 @@ export const EMPTY_BALANCE_PROFILE: BalanceProfileStats = {
   lastSessions: [],
 };
 
+const listeners = new Set<() => void>();
+let cachedProfile: BalanceProfileStats | null = null;
+
+function readStoredProfile(): BalanceProfileStats {
+  if (typeof window === 'undefined') return EMPTY_BALANCE_PROFILE;
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) return EMPTY_BALANCE_PROFILE;
+
+    const parsed = JSON.parse(stored) as Partial<BalanceProfileStats>;
+
+    return {
+      games: Number(parsed.games) || 0,
+      wins: Number(parsed.wins) || 0,
+      losses: Number(parsed.losses) || 0,
+      totalWaveReached: Number(parsed.totalWaveReached) || 0,
+      totalElapsedMs: Number(parsed.totalElapsedMs) || 0,
+      lastSessions: Array.isArray(parsed.lastSessions)
+        ? parsed.lastSessions.slice(0, 10)
+        : [],
+    };
+  } catch {
+    return EMPTY_BALANCE_PROFILE;
+  }
+}
+
 export function buildSessionSummary(
   state: BalanceBattleState,
 ): BalanceSessionSummary {
@@ -65,34 +92,23 @@ export function buildSessionSummary(
   };
 }
 
-export function loadBalanceProfile(): BalanceProfileStats {
-  if (typeof window === 'undefined') return EMPTY_BALANCE_PROFILE;
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return EMPTY_BALANCE_PROFILE;
-
-    const parsed = JSON.parse(stored) as Partial<BalanceProfileStats>;
-
-    return {
-      games: Number(parsed.games) || 0,
-      wins: Number(parsed.wins) || 0,
-      losses: Number(parsed.losses) || 0,
-      totalWaveReached: Number(parsed.totalWaveReached) || 0,
-      totalElapsedMs: Number(parsed.totalElapsedMs) || 0,
-      lastSessions: Array.isArray(parsed.lastSessions)
-        ? parsed.lastSessions.slice(0, 10)
-        : [],
-    };
-  } catch {
-    return EMPTY_BALANCE_PROFILE;
+export function getBalanceProfileSnapshot(): BalanceProfileStats {
+  if (cachedProfile === null) {
+    cachedProfile = readStoredProfile();
   }
+
+  return cachedProfile;
+}
+
+export function subscribeBalanceProfile(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
 export function recordBalanceSession(
   summary: BalanceSessionSummary,
 ): BalanceProfileStats {
-  const current = loadBalanceProfile();
+  const current = getBalanceProfileSnapshot();
 
   if (current.lastSessions.some((session) => session.sessionId === summary.sessionId)) {
     return current;
@@ -107,12 +123,15 @@ export function recordBalanceSession(
     lastSessions: [summary, ...current.lastSessions].slice(0, 10),
   };
 
+  cachedProfile = next;
+
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    // Игра остаётся полностью работоспособной, даже если хранилище запрещено.
+    // Игра остаётся работоспособной, даже если локальное хранилище запрещено.
   }
 
+  listeners.forEach((listener) => listener());
   return next;
 }
 
