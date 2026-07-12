@@ -72,7 +72,7 @@ export function FusionAtlas() {
         <div className="fusion-atlas-grid fusion-atlas-grid--single-column">
           {rows.map((row) => {
             const stats = buildFusionStats(row.composition, 2);
-            const targetLabel = stats.targetCount >= 99
+            const targetLabel = stats.attackType === 'aura' || stats.targetCount >= 99
               ? 'Все в радиусе'
               : `${stats.targetCount}`;
 
