@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check Chrome launcher
+        run: npm run check:launcher
+
       - name: Build
         run: npm run build
 
