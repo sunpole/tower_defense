@@ -8,11 +8,12 @@ import {
 import { TOWERS } from '../config/towers';
 import type {
   BattleAction,
+  BattleEffect,
   BattleEnemy,
   BattleState,
   BattleTower,
 } from '../types/Battle';
-import { getDistance, PATH_CELL_KEYS } from './battleGeometry';
+import { getDistance, getPathPosition, PATH_CELL_KEYS } from './battleGeometry';
 import { createEnemy } from './createEnemy';
 import {
   canFuseTowers,
@@ -20,8 +21,10 @@ import {
   fuseTowers,
   getFusionCost,
 } from './fusionLogic';
+import { getWaveEnemyCount, getWavePlan } from './waveBalance';
 
 let towerSequence = 0;
+let effectSequence = 0;
 
 export function createInitialBattleState(
   selectedTowerId = TOWERS[0]?.id ?? 1,
@@ -34,6 +37,7 @@ export function createInitialBattleState(
     showFusionAtlas: false,
     towers: [],
     enemies: [],
+    effects: [],
     energy: STARTING_ENERGY,
     baseHealth: STARTING_BASE_HEALTH,
     wave: 0,
@@ -53,24 +57,92 @@ function applyDamage(target: BattleEnemy, damage: number) {
   target.hp -= damage;
 }
 
-function getTowerTargets(tower: BattleTower, enemies: BattleEnemy[]) {
+function getTowerTargets(tower: BattleTower, enemies: BattleEnemy[], canIgnoreRange: boolean) {
+  return enemies
+    .filter((enemy) => enemy.hp > 0 && (canIgnoreRange || getDistance(tower, enemy) <= tower.range))
+    .sort((left, right) => right.progress - left.progress);
+}
+
+function nextEffectId() {
+  effectSequence += 1;
+  return `effect-${effectSequence}`;
+}
+
+function createLineEffect(
+  tower: BattleTower,
+  target: BattleEnemy,
+  kind: 'projectile' | 'laser',
+  label?: string,
+): BattleEffect {
+  const position = getPathPosition(target.progress);
+
+  return {
+    id: nextEffectId(),
+    kind,
+    fromX: tower.x,
+    fromY: tower.y,
+    toX: position.x,
+    toY: position.y,
+    color: tower.color,
+    ttl: kind === 'laser' ? 240 : 380,
+    label,
+  };
+}
+
+function createAuraEffect(tower: BattleTower, label?: string): BattleEffect {
+  return {
+    id: nextEffectId(),
+    kind: 'aura',
+    fromX: tower.x,
+    fromY: tower.y,
+    toX: tower.x,
+    toY: tower.y,
+    color: tower.color,
+    ttl: 460,
+    radius: tower.range,
+    label,
+  };
+}
+
+function getAbilityLabel(
+  tower: BattleTower,
+  targets: BattleEnemy[],
+  canIgnoreRange: boolean,
+  isReset: boolean,
+) {
+  const abilityIds = new Set(tower.activeAbilityIds);
+  const counter = tower.attackCounter;
+
+  if (canIgnoreRange && abilityIds.has('red-9-horizon')) return 'Выстрел за горизонт';
+  if (abilityIds.has('blue-9-network') && targets.length > 1) return 'Синяя сеть';
+  if (abilityIds.has('red-8-execute') && targets.some((target) => target.hp / target.maxHp <= 0.35)) return 'Казнь';
+  if (abilityIds.has('red-7-critical') && counter % 4 === 0) return 'Критический фокус';
+  if (abilityIds.has('green-7-burst') && counter % 6 === 0) return 'Очередь';
+  if (abilityIds.has('green-5-double') && counter % 5 === 0) return 'Двойной такт';
+  if (isReset && abilityIds.has('green-8-reset')) return 'Сброс цикла';
+  if (abilityIds.has('green-9-overload') && counter % 8 === 0) return 'Перегрузка';
+  if (abilityIds.has('blue-8-chain') && targets.length > 1 && counter % 4 === 0) return 'Цепная волна';
+  if (abilityIds.has('blue-7-split') && targets.length > 1 && counter % 4 === 0) return 'Расщепление';
+  if (abilityIds.has('blue-6-ricochet') && targets.length > 1 && counter % 4 === 0) return 'Рикошет';
+  if (abilityIds.has('red-5-focus') && counter % 6 === 0) return 'Пристрелка';
+  if (abilityIds.has('green-6-accelerate') && counter % 8 === 0) return 'Разгон';
+  if (abilityIds.has('blue-5-seeking') && counter % 6 === 0) return 'Наведение';
+
+  return undefined;
+}
+
+function attackWithTower(
+  tower: BattleTower,
+  enemies: BattleEnemy[],
+): { tower: BattleTower; effects: BattleEffect[] } {
   const canIgnoreRange =
     tower.ignoresRangeEvery > 0 &&
     tower.attackCounter > 0 &&
     tower.attackCounter % tower.ignoresRangeEvery === 0;
-
-  const possibleTargets = enemies.filter((enemy) =>
-    enemy.hp > 0 && (canIgnoreRange || getDistance(tower, enemy) <= tower.range),
-  );
-
-  return possibleTargets.sort((left, right) => right.progress - left.progress);
-}
-
-function attackWithTower(tower: BattleTower, enemies: BattleEnemy[]) {
-  const targets = getTowerTargets(tower, enemies);
+  const targets = getTowerTargets(tower, enemies, canIgnoreRange);
 
   if (targets.length === 0) {
-    return tower;
+    return { tower, effects: [] };
   }
 
   const nextTower: BattleTower = {
@@ -110,10 +182,24 @@ function attackWithTower(tower: BattleTower, enemies: BattleEnemy[]) {
 
   const resetChance = abilityIds.has('green-8-reset') ? 0.22 : 0;
   const isReset = resetChance > 0 && Math.random() < resetChance;
+  const abilityLabel = getAbilityLabel(nextTower, selectedTargets, canIgnoreRange, isReset);
+  const effects: BattleEffect[] = [];
+
+  if (nextTower.attackType === 'aura') {
+    effects.push(createAuraEffect(nextTower, abilityLabel));
+  } else {
+    const effectKind = nextTower.attackType === 'laser' ? 'laser' : 'projectile';
+    selectedTargets.forEach((target, index) => {
+      effects.push(createLineEffect(nextTower, target, effectKind, index === 0 ? abilityLabel : undefined));
+    });
+  }
 
   return {
-    ...nextTower,
-    cooldownRemaining: isReset ? Math.round(nextTower.cooldown * 0.22) : nextTower.cooldown,
+    tower: {
+      ...nextTower,
+      cooldownRemaining: isReset ? Math.round(nextTower.cooldown * 0.22) : nextTower.cooldown,
+    },
+    effects,
   };
 }
 
@@ -201,7 +287,7 @@ export function battleReducer(
       }
 
       if (state.energy < towerTemplate.placeCost) {
-        return { ...state, message: 'Недостаточно энергии для установки башни.' };
+        return { ...state, message: `Недостаточно энергии: нужно ${towerTemplate.placeCost}, доступно ${state.energy}.` };
       }
 
       towerSequence += 1;
@@ -230,7 +316,7 @@ export function battleReducer(
         ...state,
         placingTowerId: null,
         fusionSourceTowerId: selectedTower.instanceId,
-        message: 'Выберите вторую совместимую башню для слияния.',
+        message: 'Шаг 2/2: нажмите на подсвеченную совместимую башню. Цена указана рядом с ней.',
       };
     }
 
@@ -253,7 +339,7 @@ export function battleReducer(
         return {
           ...state,
           selectedPlacedTowerId: target.instanceId,
-          message: 'Эти башни пока нельзя соединить. В v0.5.0 работают чистые пары и усиление гибрида чистым цветом.',
+          message: 'Эти башни пока нельзя соединить. Работают чистые пары и усиление гибрида чистым цветом.',
         };
       }
 
@@ -263,7 +349,7 @@ export function battleReducer(
         return {
           ...state,
           selectedPlacedTowerId: source.instanceId,
-          message: `Для слияния требуется ${fusionCost} энергии.`,
+          message: `Слияние недоступно: нужно ${fusionCost} энергии, доступно ${state.energy}, не хватает ${fusionCost - state.energy}.`,
         };
       }
 
@@ -281,6 +367,10 @@ export function battleReducer(
         selectedPlacedTowerId: fusedTower.instanceId,
         fusionSourceTowerId: null,
         energy: state.energy - fusionCost,
+        effects: [
+          ...state.effects,
+          createAuraEffect(fusedTower, `${fusedTower.name} · ${fusedTower.fusionRarity}`),
+        ].slice(-36),
         message: `Слияние завершено: ${fusedTower.name}.`,
       };
     }
@@ -316,7 +406,8 @@ export function battleReducer(
       }
 
       const nextWave = state.wave + 1;
-      const enemyCount = 5 + (nextWave - 1) * 2;
+      const plan = getWavePlan(nextWave);
+      const enemyCount = getWaveEnemyCount(plan);
 
       return {
         ...state,
@@ -324,26 +415,33 @@ export function battleReducer(
         status: 'running',
         spawnRemaining: enemyCount,
         spawnCooldown: 0,
-        message: `Волна ${nextWave} началась: врагов ${enemyCount}.`,
+        message: `Волна ${nextWave}: ${plan.label}. Врагов ${enemyCount}, угроза: ${plan.threat.toLowerCase()}.`,
       };
     }
 
     case 'TICK': {
+      let effects = state.effects
+        .map((effect) => ({ ...effect, ttl: effect.ttl - action.delta }))
+        .filter((effect) => effect.ttl > 0);
+
       if (state.status !== 'running') {
-        return state;
+        return effects.length === state.effects.length ? state : { ...state, effects };
       }
 
       let spawnRemaining = state.spawnRemaining;
       let spawnCooldown = state.spawnCooldown - action.delta;
       let enemies = state.enemies.map((enemy) => ({ ...enemy }));
+      const plan = getWavePlan(state.wave);
+      const waveEnemyCount = getWaveEnemyCount(plan);
 
       if (spawnRemaining > 0 && spawnCooldown <= 0) {
-        enemies.push(createEnemy(state.wave));
+        const spawnIndex = waveEnemyCount - spawnRemaining;
+        enemies.push(createEnemy(state.wave, spawnIndex));
         spawnRemaining -= 1;
         spawnCooldown += SPAWN_INTERVAL_MS;
       }
 
-      let escapedEnemies = 0;
+      let escapedDamage = 0;
 
       enemies = enemies
         .map((enemy) => ({
@@ -353,33 +451,44 @@ export function battleReducer(
         .filter((enemy) => {
           const escaped = enemy.progress >= BATTLE_PATH.length - 1;
           if (escaped) {
-            escapedEnemies += 1;
+            escapedDamage += enemy.baseDamage;
           }
           return !escaped;
         });
 
-      const baseHealth = Math.max(0, state.baseHealth - escapedEnemies);
+      const baseHealth = Math.max(0, state.baseHealth - escapedDamage);
 
       if (baseHealth === 0) {
         return {
           ...state,
           enemies,
+          effects,
           baseHealth,
           spawnRemaining,
           spawnCooldown,
           status: 'defeat',
-          message: 'Поражение: враги разрушили базу.',
+          message: 'Поражение: враги разрушили базу. Перестройте позиции или начните слияние раньше.',
         };
       }
 
-      const towers = state.towers.map((tower) => ({
+      const cooledTowers = state.towers.map((tower) => ({
         ...tower,
         cooldownRemaining: Math.max(0, tower.cooldownRemaining - action.delta),
       }));
+      const attackedTowers: BattleTower[] = [];
 
-      const attackedTowers = towers.map((tower) =>
-        tower.cooldownRemaining > 0 ? tower : attackWithTower(tower, enemies),
-      );
+      for (const tower of cooledTowers) {
+        if (tower.cooldownRemaining > 0) {
+          attackedTowers.push(tower);
+          continue;
+        }
+
+        const result = attackWithTower(tower, enemies);
+        attackedTowers.push(result.tower);
+        effects.push(...result.effects);
+      }
+
+      effects = effects.slice(-36);
 
       let energy = state.energy;
       let kills = state.kills;
@@ -400,6 +509,7 @@ export function battleReducer(
             ...state,
             towers: attackedTowers,
             enemies: [],
+            effects,
             energy,
             baseHealth,
             spawnRemaining,
@@ -414,13 +524,14 @@ export function battleReducer(
           ...state,
           towers: attackedTowers,
           enemies: [],
-          energy: energy + 25,
+          effects,
+          energy: energy + plan.completionBonus,
           baseHealth,
           spawnRemaining,
           spawnCooldown,
           kills,
           status: 'idle',
-          message: `Волна ${state.wave} завершена. Бонус: 25 энергии.`,
+          message: `Волна ${state.wave} завершена. Бонус: ${plan.completionBonus} энергии. Подготовьтесь к следующей угрозе.`,
         };
       }
 
@@ -428,6 +539,7 @@ export function battleReducer(
         ...state,
         towers: attackedTowers,
         enemies: survivors,
+        effects,
         energy,
         baseHealth,
         spawnRemaining,
