@@ -12,6 +12,7 @@ import {
   getFusionCost,
 } from '../game/fusionLogic';
 import type { BattleDispatch, BattleState } from '../types/Battle';
+import { BattleEffects } from './BattleEffects';
 
 interface BattleBoardProps {
   state: BattleState;
@@ -101,6 +102,8 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         />
       )}
 
+      <BattleEffects effects={state.effects} />
+
       {state.towers.map((tower) => {
         const isSelected = tower.instanceId === state.selectedPlacedTowerId;
         const isFusionSource = tower.instanceId === state.fusionSourceTowerId;
@@ -155,10 +158,10 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
 
         return (
           <div
-            className="battle-enemy"
+            className={`battle-enemy battle-enemy--${enemy.archetype}`}
             key={enemy.instanceId}
             style={getEntityPosition(position.x, position.y)}
-            title={`${enemy.name}: ${Math.max(0, Math.ceil(enemy.hp))} HP`}
+            title={`${enemy.name}: ${Math.max(0, Math.ceil(enemy.hp))} HP · урон базе ${enemy.baseDamage}`}
           >
             <div className="enemy-health">
               <span style={{ width: `${hpPercent}%` }} />
