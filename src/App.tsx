@@ -6,6 +6,7 @@ import './combatEffects.css';
 import './battleBalance.css';
 import './stableWorkspace.css';
 import './fullscreenWorkspace.css';
+import './livingRoute.css';
 import { Battle } from './components/Battle';
 
 function App() {
