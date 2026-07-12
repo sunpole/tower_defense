@@ -78,6 +78,21 @@ function chooseFusionColors(source: BattleTower, target: BattleTower) {
   return [sourceColor, targetColor] as const;
 }
 
+function buildLevelStats(composition: FusionComposition, level: number) {
+  const base = buildFusionStats(composition, 1);
+  const multiplier = 1 + Math.max(0, level - 1) * 0.5;
+
+  return {
+    ...base,
+    damage: Math.round(base.damage * multiplier),
+    range: Number((base.range * multiplier).toFixed(2)),
+    cooldown: Math.max(180, Math.round(base.cooldown / multiplier)),
+    targetCount: base.targetCount >= 99
+      ? base.targetCount
+      : Math.max(1, Math.round(base.targetCount * multiplier)),
+  };
+}
+
 function buildFusionResult(
   source: BattleTower,
   target: BattleTower,
@@ -85,7 +100,7 @@ function buildFusionResult(
 ): BattleTower {
   const [leftColor, rightColor] = chooseFusionColors(source, target);
   const composition = buildComposition(leftColor, rightColor);
-  const stats = buildFusionStats(composition, nextLevel);
+  const stats = buildLevelStats(composition, nextLevel);
   const abilities = getActiveFusionAbilities(composition);
 
   return {
