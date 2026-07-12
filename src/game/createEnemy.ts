@@ -1,23 +1,38 @@
 import { ENEMIES } from '../config/enemies';
 import type { BattleEnemy } from '../types/Battle';
+import {
+  getWavePlan,
+  getWaveSequence,
+  type EnemyArchetypeId,
+} from './waveBalance';
 
 let enemySequence = 0;
 
-export function createEnemy(wave: number): BattleEnemy {
-  const template = ENEMIES[0];
-  const hpMultiplier = 1 + (wave - 1) * 0.28;
-  const speedMultiplier = 1 + (wave - 1) * 0.05;
-  const hp = Math.round(template.hp * hpMultiplier);
+const TEMPLATE_BY_ARCHETYPE: Record<EnemyArchetypeId, number> = {
+  normal: 0,
+  swift: 1,
+  brute: 2,
+  elite: 3,
+};
+
+export function createEnemy(wave: number, spawnIndex: number): BattleEnemy {
+  const plan = getWavePlan(wave);
+  const sequence = getWaveSequence(plan);
+  const archetype = sequence[Math.min(spawnIndex, sequence.length - 1)] ?? 'normal';
+  const template = ENEMIES[TEMPLATE_BY_ARCHETYPE[archetype]];
+  const hp = Math.round(template.hp * plan.hpMultiplier);
 
   enemySequence += 1;
 
   return {
     ...template,
     instanceId: `enemy-${enemySequence}`,
+    archetype,
+    baseDamage: archetype === 'elite' ? 2 : 1,
     hp,
     maxHp: hp,
-    speed: template.speed * speedMultiplier,
-    rewardEnergy: template.rewardEnergy + (wave - 1) * 2,
+    speed: Number((template.speed * plan.speedMultiplier).toFixed(3)),
+    rewardEnergy: Math.round(template.rewardEnergy * plan.rewardMultiplier),
     progress: 0,
   };
 }
