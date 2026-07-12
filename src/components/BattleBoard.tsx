@@ -22,25 +22,55 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
   );
 
   return (
-    <div className="battle-board" style={boardStyle}>
+    <div
+      className={`battle-board${state.placementMode ? ' battle-board--placing' : ''}`}
+      style={boardStyle}
+    >
       {Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => {
         const x = index % BOARD_COLUMNS;
         const y = Math.floor(index / BOARD_COLUMNS);
         const isPathCell = PATH_CELL_KEYS.has(`${x}:${y}`);
+        const towerAtCell = state.towers.find(
+          (tower) => tower.x === x && tower.y === y,
+        );
+        const isGameFinished = state.status === 'victory' || state.status === 'defeat';
+
+        const handleCellClick = () => {
+          if (towerAtCell) {
+            dispatch({
+              type: 'SELECT_PLACED_TOWER',
+              instanceId: towerAtCell.instanceId,
+            });
+            return;
+          }
+
+          if (state.placementMode) {
+            dispatch({ type: 'PLACE_TOWER', x, y });
+            return;
+          }
+
+          dispatch({ type: 'CLEAR_SELECTION' });
+        };
 
         return (
           <button
-            className={`board-cell${isPathCell ? ' board-cell--path' : ''}`}
-            disabled={
-              isPathCell || state.status === 'victory' || state.status === 'defeat'
-            }
+            className={[
+              'board-cell',
+              isPathCell ? 'board-cell--path' : '',
+              towerAtCell ? 'board-cell--occupied' : '',
+            ].filter(Boolean).join(' ')}
+            disabled={isPathCell || (isGameFinished && !towerAtCell)}
             key={`${x}:${y}`}
-            onClick={() => dispatch({ type: 'PLACE_TOWER', x, y })}
+            onClick={handleCellClick}
             type="button"
             aria-label={
               isPathCell
                 ? `Дорога, клетка ${x + 1}:${y + 1}`
-                : `Поставить башню, клетка ${x + 1}:${y + 1}`
+                : towerAtCell
+                  ? `${towerAtCell.name}, уровень ${towerAtCell.level}. Выбрать башню`
+                  : state.placementMode
+                    ? `Установить башню, клетка ${x + 1}:${y + 1}`
+                    : `Пустая клетка ${x + 1}:${y + 1}`
             }
           />
         );
@@ -63,24 +93,19 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         const isSelected = tower.instanceId === state.selectedPlacedTowerId;
 
         return (
-          <button
-            aria-label={`${tower.name}, уровень ${tower.level}. Выбрать башню`}
-            aria-pressed={isSelected}
+          <div
+            aria-hidden="true"
             className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}`}
             key={tower.instanceId}
-            onClick={() =>
-              dispatch({ type: 'SELECT_PLACED_TOWER', instanceId: tower.instanceId })
-            }
             style={{
               ...getEntityPosition(tower.x, tower.y),
               borderColor: tower.color,
               boxShadow: `0 0 18px ${tower.color}66`,
             }}
             title={`${tower.name}: уровень ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
-            type="button"
           >
             <span style={{ color: tower.color }}>{tower.symbol}</span>
-          </button>
+          </div>
         );
       })}
 
