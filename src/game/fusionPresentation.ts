@@ -11,7 +11,7 @@ export function getAbilityExactEffect(abilityId: string): string {
     case 'red-9-horizon':
       return 'Каждая 4-я атака игнорирует радиус; легендарный состав также даёт +10% урона.';
     case 'green-5-double':
-      return 'Каждая 5-я атака повторяет 55% урона по основной цели.';
+      return 'До 2 целей; каждая 5-я атака повторяет 55% урона по основной цели.';
     case 'green-6-accelerate':
       return 'Перезарядка сокращается на 14%.';
     case 'green-7-burst':
