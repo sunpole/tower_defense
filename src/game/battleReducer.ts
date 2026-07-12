@@ -16,13 +16,17 @@ import type {
 import { getDistance, getPathPosition } from './battleGeometry';
 import { createEnemy } from './createEnemy';
 import {
-  canFuseTowers,
-  createBaseBattleTower,
-  fuseTowers,
-  getFusionCost,
-} from './fusionLogic';
+  createRandomFusion,
+  createSuperFusion,
+  getSuperFusionTargets,
+} from './fusionEconomy';
+import { createBaseBattleTower } from './fusionLogic';
 import { generateBattleRoute } from './routeGeneration';
-import { getWaveEnemyCount, getWavePlan } from './waveBalance';
+import {
+  getVisibleWaveEnemyCount,
+  getWaveEnemyCount,
+  getWavePlan,
+} from './waveBalance';
 
 let towerSequence = 0;
 let effectSequence = 0;
@@ -51,13 +55,15 @@ export function createInitialBattleState(
     routeThreatMultiplier: route.threatMultiplier,
     routeRewardMultiplier: route.rewardMultiplier,
     energy: STARTING_ENERGY,
+    fusionPoints: 0,
+    superFusionPoints: 0,
     baseHealth: STARTING_BASE_HEALTH,
     wave: 0,
     status: 'idle',
     spawnRemaining: 0,
     spawnCooldown: 0,
     kills: 0,
-    message: `${route.label}: ${route.length} клеток, поворотов ${route.turns}. Выберите башню и подготовьте защиту.`,
+    message: `${route.label}: ${route.length} клеток, поворотов ${route.turns}. Энергия тратится только на простые башни.`,
   };
 }
 
@@ -238,6 +244,21 @@ function attackWithTower(
   };
 }
 
+function replacePairWithTower(
+  towers: BattleTower[],
+  source: BattleTower,
+  target: BattleTower,
+  result: BattleTower,
+) {
+  return towers
+    .filter(
+      (tower) =>
+        tower.instanceId !== source.instanceId &&
+        tower.instanceId !== target.instanceId,
+    )
+    .concat(result);
+}
+
 export function battleReducer(
   state: BattleState,
   action: BattleAction,
@@ -269,7 +290,7 @@ export function battleReducer(
         ...state,
         placingTowerId: null,
         selectedPlacedTowerId: tower.instanceId,
-        message: `${tower.name}. Вы можете начать слияние или продать башню.`,
+        message: `${tower.name}. Уровень ${tower.level}. Доступны случайное и суперслияние.`,
       };
     }
 
@@ -294,7 +315,7 @@ export function battleReducer(
           type:
             state.fusionSourceTowerId &&
             state.fusionSourceTowerId !== occupiedTower.instanceId
-              ? 'FUSE_WITH_TOWER'
+              ? 'SUPER_FUSE_WITH_TOWER'
               : 'SELECT_PLACED_TOWER',
           instanceId: occupiedTower.instanceId,
         } as BattleAction);
@@ -305,7 +326,7 @@ export function battleReducer(
           ...state,
           selectedPlacedTowerId: null,
           fusionSourceTowerId: null,
-          message: 'Пустая клетка. Чтобы поставить башню, сначала выберите цвет в арсенале.',
+          message: 'Пустая клетка. Чтобы поставить башню, выберите цвет в магазине.',
         };
       }
 
@@ -344,33 +365,79 @@ export function battleReducer(
         fusionSourceTowerId: null,
         placingTowerId: null,
         energy: state.energy - towerTemplate.placeCost,
-        message: `${tower.name} установлена. Режим установки выключен.`,
+        message: `${tower.name} установлена. Энергия потрачена только на покупку башни.`,
       };
     }
 
-    case 'START_FUSION': {
+    case 'RANDOM_FUSION': {
+      if (state.fusionPoints < 1) {
+        return { ...state, message: 'Нужно хотя бы 1 очко слияния от Кубиков судьбы.' };
+      }
+
+      const fusion = createRandomFusion(state.towers);
+
+      if (!fusion) {
+        return {
+          ...state,
+          message: 'Для случайного слияния нужны хотя бы две башни одного уровня.',
+        };
+      }
+
+      return {
+        ...state,
+        towers: replacePairWithTower(
+          state.towers,
+          fusion.source,
+          fusion.target,
+          fusion.result,
+        ),
+        selectedPlacedTowerId: fusion.result.instanceId,
+        fusionSourceTowerId: null,
+        fusionPoints: state.fusionPoints - 1,
+        effects: [
+          ...state.effects,
+          createAuraEffect(fusion.result, `🎲 ${fusion.result.name}`),
+        ].slice(-36),
+        message: `Случайное слияние выбрало две башни уровня ${fusion.result.level}: создана ${fusion.result.name}.`,
+      };
+    }
+
+    case 'START_SUPER_FUSION': {
       const selectedTower = getSelectedTower(state);
 
       if (!selectedTower) {
         return { ...state, message: 'Сначала выберите установленную башню.' };
       }
 
+      if (state.superFusionPoints < 1) {
+        return { ...state, message: 'Нужно очко суперслияния за уничтоженного босса.' };
+      }
+
+      const targets = getSuperFusionTargets(selectedTower, state.towers);
+
+      if (targets.length === 0) {
+        return {
+          ...state,
+          message: `Для суперслияния нужна вторая башня уровня ${selectedTower.level}.`,
+        };
+      }
+
       return {
         ...state,
         placingTowerId: null,
         fusionSourceTowerId: selectedTower.instanceId,
-        message: 'Шаг 2/2: нажмите на подсвеченную совместимую башню. Цена указана рядом с ней.',
+        message: `Суперслияние: выберите башню уровня ${selectedTower.level}, отмеченную значком 🧬.`,
       };
     }
 
-    case 'CANCEL_FUSION':
+    case 'CANCEL_SUPER_FUSION':
       return {
         ...state,
         fusionSourceTowerId: null,
-        message: 'Слияние отменено.',
+        message: 'Режим суперслияния отменён.',
       };
 
-    case 'FUSE_WITH_TOWER': {
+    case 'SUPER_FUSE_WITH_TOWER': {
       const source = state.towers.find(
         (tower) => tower.instanceId === state.fusionSourceTowerId,
       );
@@ -379,53 +446,38 @@ export function battleReducer(
       );
 
       if (!source || !target) {
-        return { ...state, message: 'Для слияния нужны две выбранные башни.' };
+        return { ...state, message: 'Для суперслияния нужны две выбранные башни.' };
       }
 
-      if (!canFuseTowers(source, target)) {
+      if (state.superFusionPoints < 1) {
+        return {
+          ...state,
+          fusionSourceTowerId: null,
+          message: 'Очки суперслияния закончились.',
+        };
+      }
+
+      const fusedTower = createSuperFusion(source, target);
+
+      if (!fusedTower) {
         return {
           ...state,
           selectedPlacedTowerId: target.instanceId,
-          message: 'Эти башни пока нельзя соединить. Работают чистые пары и усиление гибрида чистым цветом.',
+          message: `Нужна башня того же уровня: ${source.level}.`,
         };
-      }
-
-      const fusionCost = getFusionCost(source, target);
-
-      if (state.energy < fusionCost) {
-        return {
-          ...state,
-          selectedPlacedTowerId: source.instanceId,
-          message: `Слияние недоступно: нужно ${fusionCost} энергии, доступно ${state.energy}, не хватает ${fusionCost - state.energy}.`,
-        };
-      }
-
-      const fusedTower = fuseTowers(source, target, fusionCost);
-
-      if (!fusedTower) {
-        return { ...state, message: 'Слияние не удалось.' };
       }
 
       return {
         ...state,
-        towers: state.towers
-          .filter(
-            (tower) =>
-              tower.instanceId !== source.instanceId &&
-              tower.instanceId !== target.instanceId,
-          )
-          .concat(fusedTower),
+        towers: replacePairWithTower(state.towers, source, target, fusedTower),
         selectedPlacedTowerId: fusedTower.instanceId,
         fusionSourceTowerId: null,
-        energy: state.energy - fusionCost,
+        superFusionPoints: state.superFusionPoints - 1,
         effects: [
           ...state.effects,
-          createAuraEffect(
-            fusedTower,
-            `${fusedTower.name} · ${fusedTower.fusionRarity}`,
-          ),
+          createAuraEffect(fusedTower, `🧬 Уровень ${fusedTower.level}`),
         ].slice(-36),
-        message: `Слияние завершено: ${fusedTower.name}.`,
+        message: `Суперслияние завершено: ${fusedTower.name}, уровень ${fusedTower.level}.`,
       };
     }
 
@@ -460,8 +512,9 @@ export function battleReducer(
       if (state.status === 'running' || state.wave >= TOTAL_WAVES) return state;
 
       const nextWave = state.wave + 1;
-      const plan = getWavePlan(nextWave);
+      const plan = getWavePlan(nextWave, state.routeSeed);
       const enemyCount = getWaveEnemyCount(plan);
+      const visibleCount = getVisibleWaveEnemyCount(plan);
 
       return {
         ...state,
@@ -469,7 +522,7 @@ export function battleReducer(
         status: 'running',
         spawnRemaining: enemyCount,
         spawnCooldown: 0,
-        message: `Волна ${nextWave}: ${plan.label}. Врагов ${enemyCount}, угроза: ${plan.threat.toLowerCase()}.`,
+        message: `Волна ${nextWave}: ${plan.label}. Основных врагов ${visibleCount}. Возможны скрытые сюрпризы.`,
       };
     }
 
@@ -487,7 +540,7 @@ export function battleReducer(
       let spawnRemaining = state.spawnRemaining;
       let spawnCooldown = state.spawnCooldown - action.delta;
       let enemies = state.enemies.map((enemy) => ({ ...enemy }));
-      const plan = getWavePlan(state.wave);
+      const plan = getWavePlan(state.wave, state.routeSeed);
       const waveEnemyCount = getWaveEnemyCount(plan);
 
       if (spawnRemaining > 0 && spawnCooldown <= 0) {
@@ -498,6 +551,7 @@ export function battleReducer(
             spawnIndex,
             state.routeThreatMultiplier,
             state.routeRewardMultiplier,
+            state.routeSeed,
           ),
         );
         spawnRemaining -= 1;
@@ -528,7 +582,7 @@ export function battleReducer(
           spawnRemaining,
           spawnCooldown,
           status: 'defeat',
-          message: 'Поражение: враги разрушили базу. Перестройте позиции или начните слияние раньше.',
+          message: 'Поражение: враги разрушили базу. Перестройте позиции или используйте слияния раньше.',
         };
       }
 
@@ -555,12 +609,18 @@ export function battleReducer(
       effects = effects.slice(-36);
 
       let energy = state.energy;
+      let fusionPoints = state.fusionPoints;
+      let superFusionPoints = state.superFusionPoints;
       let kills = state.kills;
       const survivors: BattleEnemy[] = [];
 
       for (const enemy of enemies) {
         if (enemy.hp <= 0) {
           energy += enemy.rewardEnergy;
+          fusionPoints += enemy.fusionPointReward ?? 0;
+          if (enemy.archetype === 'miniBoss' || enemy.archetype === 'boss') {
+            superFusionPoints += 1;
+          }
           kills += 1;
         } else {
           survivors.push(enemy);
@@ -575,6 +635,8 @@ export function battleReducer(
             enemies: [],
             effects,
             energy,
+            fusionPoints,
+            superFusionPoints,
             baseHealth,
             spawnRemaining,
             spawnCooldown,
@@ -590,12 +652,14 @@ export function battleReducer(
           enemies: [],
           effects,
           energy: energy + plan.completionBonus,
+          fusionPoints,
+          superFusionPoints,
           baseHealth,
           spawnRemaining,
           spawnCooldown,
           kills,
           status: 'idle',
-          message: `Волна ${state.wave} завершена. Бонус: ${plan.completionBonus} энергии. Подготовьтесь к следующей угрозе.`,
+          message: `Волна ${state.wave} завершена. Бонус: ${plan.completionBonus} энергии.`,
         };
       }
 
@@ -605,6 +669,8 @@ export function battleReducer(
         enemies: survivors,
         effects,
         energy,
+        fusionPoints,
+        superFusionPoints,
         baseHealth,
         spawnRemaining,
         spawnCooldown,
