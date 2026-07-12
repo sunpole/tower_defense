@@ -1,35 +1,29 @@
 import type { CSSProperties } from 'react';
 import { TOWERS } from '../config/towers';
-import type { BattleDispatch } from '../types/Battle';
+import type { BattleDispatch, BattleState } from '../types/Battle';
 
 interface TowerShopProps {
-  selectedTowerId: number;
-  placementMode: boolean;
+  state: BattleState;
   dispatch: BattleDispatch;
 }
 
-export function TowerShop({
-  selectedTowerId,
-  placementMode,
-  dispatch,
-}: TowerShopProps) {
-  const selectedTower = TOWERS.find((tower) => tower.id === selectedTowerId);
+export function TowerShop({ state, dispatch }: TowerShopProps) {
+  const selectedTower = TOWERS.find((tower) => tower.id === state.selectedTowerId);
 
   return (
     <aside className="tower-shop" aria-label="Выбор башен">
       <div className="tower-shop__heading">
         <p className="eyebrow">Арсенал</p>
-        <h2>Выберите башню</h2>
+        <h2>Выберите цвет</h2>
       </div>
 
       <div className="tower-list">
         {TOWERS.map((tower) => {
-          const isReadyToPlace = placementMode && tower.id === selectedTowerId;
+          const isSelected = tower.id === state.placingTowerId;
 
           return (
             <button
-              aria-pressed={isReadyToPlace}
-              className={`tower-option${isReadyToPlace ? ' tower-option--selected' : ''}`}
+              className={`tower-option${isSelected ? ' tower-option--selected' : ''}`}
               key={tower.id}
               onClick={() => dispatch({ type: 'SELECT_TOWER', towerId: tower.id })}
               style={{ '--tower-color': tower.color } as CSSProperties}
@@ -48,22 +42,18 @@ export function TowerShop({
         })}
       </div>
 
-      <div className={`selection-note${placementMode ? ' selection-note--active' : ''}`}>
-        {placementMode && selectedTower ? (
-          <>
-            В руке: <strong>{selectedTower.name}</strong>.
-            <br />
-            Нажмите на свободную клетку. Повторный клик по этой карточке отменит установку.
-          </>
+      <div className="selection-note">
+        {state.placingTowerId && selectedTower ? (
+          <>Режим установки: <strong>{selectedTower.name}</strong></>
         ) : (
-          'Режим установки выключен. Нажмите на тип башни, чтобы взять её.'
+          <>Режим установки выключен. Нажмите на цвет, чтобы взять башню.</>
         )}
       </div>
 
       <ol className="game-help">
-        <li>Нажмите на тип башни, затем на свободную клетку.</li>
-        <li>После установки режим автоматически выключится.</li>
-        <li>Нажмите на занятую клетку, чтобы выбрать установленную башню.</li>
+        <li>Нажмите на цвет, затем на свободную клетку.</li>
+        <li>После установки режим автоматически выключается.</li>
+        <li>Выберите две совместимые башни, чтобы создать гибрид.</li>
       </ol>
     </aside>
   );

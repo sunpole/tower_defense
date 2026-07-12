@@ -2,9 +2,11 @@ import { useReducer } from 'react';
 import { battleReducer, createInitialBattleState } from '../game/battleReducer';
 import { useBattleLoop } from '../hooks/useBattleLoop';
 import '../towerManagement.css';
+import '../colorFusion.css';
 import { BattleBoard } from './BattleBoard';
 import { BattleControls } from './BattleControls';
 import { BattleHeader } from './BattleHeader';
+import { FusionAtlas } from './FusionAtlas';
 import { TowerInspector } from './TowerInspector';
 import { TowerShop } from './TowerShop';
 
@@ -31,16 +33,19 @@ export function Battle() {
         </section>
 
         <div className="game-sidebar">
-          <TowerShop
-            selectedTowerId={state.selectedTowerId}
-            placementMode={state.placementMode}
-            dispatch={dispatch}
-          />
-          <TowerInspector
-            tower={selectedPlacedTower}
-            energy={state.energy}
-            dispatch={dispatch}
-          />
+          {selectedPlacedTower ? (
+            <TowerInspector
+              tower={selectedPlacedTower}
+              state={state}
+              dispatch={dispatch}
+            />
+          ) : (
+            <TowerShop
+              state={state}
+              dispatch={dispatch}
+            />
+          )}
+          <FusionAtlas state={state} dispatch={dispatch} />
         </div>
       </div>
     </main>

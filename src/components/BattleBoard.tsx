@@ -5,6 +5,9 @@ import {
   getPathPosition,
   PATH_CELL_KEYS,
 } from '../game/battleGeometry';
+import { canFuseTowers } from '../game/fusionLogic';
+import { getCompositionSegments } from '../game/fusionLogic';
+import { FUSION_COLORS } from '../config/fusionSystem';
 import type { BattleDispatch, BattleState } from '../types/Battle';
 
 interface BattleBoardProps {
@@ -20,57 +23,37 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
   const selectedTower = state.towers.find(
     (tower) => tower.instanceId === state.selectedPlacedTowerId,
   );
+  const fusionSourceTower = state.towers.find(
+    (tower) => tower.instanceId === state.fusionSourceTowerId,
+  );
 
   return (
-    <div
-      className={`battle-board${state.placementMode ? ' battle-board--placing' : ''}`}
-      style={boardStyle}
-    >
+    <div className="battle-board" style={boardStyle}>
       {Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => {
         const x = index % BOARD_COLUMNS;
         const y = Math.floor(index / BOARD_COLUMNS);
         const isPathCell = PATH_CELL_KEYS.has(`${x}:${y}`);
-        const towerAtCell = state.towers.find(
-          (tower) => tower.x === x && tower.y === y,
+        const occupiedTower = state.towers.find((tower) => tower.x === x && tower.y === y);
+        const isFusionTarget = Boolean(
+          fusionSourceTower &&
+          occupiedTower &&
+          fusionSourceTower.instanceId !== occupiedTower.instanceId &&
+          canFuseTowers(fusionSourceTower, occupiedTower),
         );
-        const isGameFinished = state.status === 'victory' || state.status === 'defeat';
-
-        const handleCellClick = () => {
-          if (towerAtCell) {
-            dispatch({
-              type: 'SELECT_PLACED_TOWER',
-              instanceId: towerAtCell.instanceId,
-            });
-            return;
-          }
-
-          if (state.placementMode) {
-            dispatch({ type: 'PLACE_TOWER', x, y });
-            return;
-          }
-
-          dispatch({ type: 'CLEAR_SELECTION' });
-        };
 
         return (
           <button
-            className={[
-              'board-cell',
-              isPathCell ? 'board-cell--path' : '',
-              towerAtCell ? 'board-cell--occupied' : '',
-            ].filter(Boolean).join(' ')}
-            disabled={isPathCell || (isGameFinished && !towerAtCell)}
+            className={`board-cell${isPathCell ? ' board-cell--path' : ''}${occupiedTower ? ' board-cell--occupied' : ''}${isFusionTarget ? ' board-cell--fusion-target' : ''}`}
+            disabled={isPathCell || state.status === 'victory' || state.status === 'defeat'}
             key={`${x}:${y}`}
-            onClick={handleCellClick}
+            onClick={() => dispatch({ type: 'PLACE_TOWER', x, y })}
             type="button"
             aria-label={
-              isPathCell
-                ? `Дорога, клетка ${x + 1}:${y + 1}`
-                : towerAtCell
-                  ? `${towerAtCell.name}, уровень ${towerAtCell.level}. Выбрать башню`
-                  : state.placementMode
-                    ? `Установить башню, клетка ${x + 1}:${y + 1}`
-                    : `Пустая клетка ${x + 1}:${y + 1}`
+              occupiedTower
+                ? `${occupiedTower.name}, клетка ${x + 1}:${y + 1}`
+                : isPathCell
+                  ? `Дорога, клетка ${x + 1}:${y + 1}`
+                  : `Свободная клетка ${x + 1}:${y + 1}`
             }
           />
         );
@@ -91,20 +74,30 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
 
       {state.towers.map((tower) => {
         const isSelected = tower.instanceId === state.selectedPlacedTowerId;
+        const isFusionSource = tower.instanceId === state.fusionSourceTowerId;
+        const segments = getCompositionSegments(tower.composition);
 
         return (
           <div
             aria-hidden="true"
-            className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}`}
+            className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}${isFusionSource ? ' placed-tower--fusion-source' : ''}`}
             key={tower.instanceId}
             style={{
               ...getEntityPosition(tower.x, tower.y),
               borderColor: tower.color,
               boxShadow: `0 0 18px ${tower.color}66`,
             }}
-            title={`${tower.name}: уровень ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
+            title={`${tower.name}: ранг ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
           >
             <span style={{ color: tower.color }}>{tower.symbol}</span>
+            <span className="tower-mini-composition">
+              {segments.map((colorId, segmentIndex) => (
+                <i
+                  key={`${tower.instanceId}-${colorId}-${segmentIndex}`}
+                  style={{ background: FUSION_COLORS[colorId].hex }}
+                />
+              ))}
+            </span>
           </div>
         );
       })}

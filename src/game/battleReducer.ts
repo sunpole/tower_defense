@@ -15,10 +15,11 @@ import type {
 import { getDistance, PATH_CELL_KEYS } from './battleGeometry';
 import { createEnemy } from './createEnemy';
 import {
-  getTowerSellRefund,
-  getTowerUpgradeCost,
-  upgradeTower,
-} from './towerProgression';
+  canFuseTowers,
+  createBaseBattleTower,
+  fuseTowers,
+  getFusionCost,
+} from './fusionLogic';
 
 let towerSequence = 0;
 
@@ -27,8 +28,10 @@ export function createInitialBattleState(
 ): BattleState {
   return {
     selectedTowerId,
-    placementMode: false,
+    placingTowerId: null,
     selectedPlacedTowerId: null,
+    fusionSourceTowerId: null,
+    showFusionAtlas: false,
     towers: [],
     enemies: [],
     energy: STARTING_ENERGY,
@@ -38,7 +41,79 @@ export function createInitialBattleState(
     spawnRemaining: 0,
     spawnCooldown: 0,
     kills: 0,
-    message: 'Выберите тип башни в арсенале, затем нажмите на свободную клетку.',
+    message: 'Нажмите на тип башни, затем на свободную клетку. Башни развиваются через слияние цветов.',
+  };
+}
+
+function getSelectedTower(state: BattleState) {
+  return state.towers.find((tower) => tower.instanceId === state.selectedPlacedTowerId) ?? null;
+}
+
+function applyDamage(target: BattleEnemy, damage: number) {
+  target.hp -= damage;
+}
+
+function getTowerTargets(tower: BattleTower, enemies: BattleEnemy[]) {
+  const canIgnoreRange =
+    tower.ignoresRangeEvery > 0 &&
+    tower.attackCounter > 0 &&
+    tower.attackCounter % tower.ignoresRangeEvery === 0;
+
+  const possibleTargets = enemies.filter((enemy) =>
+    enemy.hp > 0 && (canIgnoreRange || getDistance(tower, enemy) <= tower.range),
+  );
+
+  return possibleTargets.sort((left, right) => right.progress - left.progress);
+}
+
+function attackWithTower(tower: BattleTower, enemies: BattleEnemy[]) {
+  const targets = getTowerTargets(tower, enemies);
+
+  if (targets.length === 0) {
+    return tower;
+  }
+
+  const nextTower: BattleTower = {
+    ...tower,
+    attackCounter: tower.attackCounter + 1,
+  };
+  const abilityIds = new Set(nextTower.activeAbilityIds);
+  const isAreaAttack = nextTower.attackType === 'aura' || abilityIds.has('blue-9-network');
+  const targetLimit = isAreaAttack ? targets.length : Math.min(nextTower.targetCount, targets.length);
+  const selectedTargets = targets.slice(0, targetLimit);
+
+  selectedTargets.forEach((target, index) => {
+    let damage = nextTower.damage;
+
+    if (index > 0) {
+      damage *= abilityIds.has('blue-8-chain') ? 0.55 : 0.42;
+    }
+
+    if (abilityIds.has('red-8-execute') && target.hp / target.maxHp <= 0.35) {
+      damage *= 1.75;
+    }
+
+    if (abilityIds.has('red-7-critical') && nextTower.attackCounter % 4 === 0) {
+      damage *= 2;
+    }
+
+    applyDamage(target, Math.round(damage));
+  });
+
+  if (abilityIds.has('green-5-double') && nextTower.attackCounter % 5 === 0 && selectedTargets[0]) {
+    applyDamage(selectedTargets[0], Math.round(nextTower.damage * 0.55));
+  }
+
+  if (abilityIds.has('green-7-burst') && nextTower.attackCounter % 6 === 0) {
+    selectedTargets.slice(0, 3).forEach((target) => applyDamage(target, Math.round(nextTower.damage * 0.45)));
+  }
+
+  const resetChance = abilityIds.has('green-8-reset') ? 0.22 : 0;
+  const isReset = resetChance > 0 && Math.random() < resetChance;
+
+  return {
+    ...nextTower,
+    cooldownRemaining: isReset ? Math.round(nextTower.cooldown * 0.22) : nextTower.cooldown,
   };
 }
 
@@ -48,23 +123,17 @@ export function battleReducer(
 ): BattleState {
   switch (action.type) {
     case 'SELECT_TOWER': {
-      const isCancellingPlacement =
-        state.placementMode && state.selectedTowerId === action.towerId;
-
-      if (isCancellingPlacement) {
-        return {
-          ...state,
-          placementMode: false,
-          message: 'Установка отменена. Выберите башню на поле или тип в арсенале.',
-        };
-      }
+      const isSameTower = state.placingTowerId === action.towerId;
 
       return {
         ...state,
         selectedTowerId: action.towerId,
-        placementMode: true,
+        placingTowerId: isSameTower ? null : action.towerId,
         selectedPlacedTowerId: null,
-        message: 'Башня взята для установки. Нажмите на свободную клетку поля.',
+        fusionSourceTowerId: null,
+        message: isSameTower
+          ? 'Режим установки выключен.'
+          : 'Режим установки включён. Нажмите на свободную клетку.',
       };
     }
 
@@ -79,18 +148,19 @@ export function battleReducer(
 
       return {
         ...state,
-        placementMode: false,
+        placingTowerId: null,
         selectedPlacedTowerId: tower.instanceId,
-        message: `${tower.name}, уровень ${tower.level}. Доступны улучшение и продажа.`,
+        message: `${tower.name}. Вы можете начать слияние или продать башню.`,
       };
     }
 
     case 'CLEAR_SELECTION':
       return {
         ...state,
-        placementMode: false,
+        placingTowerId: null,
         selectedPlacedTowerId: null,
-        message: 'Ничего не выбрано. Выберите башню на поле или тип в арсенале.',
+        fusionSourceTowerId: null,
+        message: 'Выделение снято.',
       };
 
     case 'PLACE_TOWER': {
@@ -98,11 +168,23 @@ export function battleReducer(
         return state;
       }
 
-      if (!state.placementMode) {
+      const occupiedTower = state.towers.find((tower) => tower.x === action.x && tower.y === action.y);
+
+      if (occupiedTower) {
+        return battleReducer(state, {
+          type: state.fusionSourceTowerId && state.fusionSourceTowerId !== occupiedTower.instanceId
+            ? 'FUSE_WITH_TOWER'
+            : 'SELECT_PLACED_TOWER',
+          instanceId: occupiedTower.instanceId,
+        } as BattleAction);
+      }
+
+      if (!state.placingTowerId) {
         return {
           ...state,
           selectedPlacedTowerId: null,
-          message: 'Сначала выберите тип башни в арсенале.',
+          fusionSourceTowerId: null,
+          message: 'Пустая клетка. Чтобы поставить башню, сначала выберите цвет в арсенале.',
         };
       }
 
@@ -110,12 +192,8 @@ export function battleReducer(
         return { ...state, message: 'На дороге башню ставить нельзя.' };
       }
 
-      if (state.towers.some((tower) => tower.x === action.x && tower.y === action.y)) {
-        return { ...state, message: 'Эта клетка уже занята.' };
-      }
-
       const towerTemplate = TOWERS.find(
-        (tower) => tower.id === state.selectedTowerId,
+        (tower) => tower.id === state.placingTowerId,
       );
 
       if (!towerTemplate) {
@@ -128,84 +206,109 @@ export function battleReducer(
 
       towerSequence += 1;
       const instanceId = `tower-${towerSequence}`;
-
-      const tower: BattleTower = {
-        ...towerTemplate,
-        instanceId,
-        x: action.x,
-        y: action.y,
-        lastShot: 0,
-        buffId: null,
-        cooldownRemaining: 0,
-        investedEnergy: towerTemplate.placeCost,
-      };
+      const tower = createBaseBattleTower(towerTemplate, instanceId, action.x, action.y);
 
       return {
         ...state,
         towers: [...state.towers, tower],
-        placementMode: false,
         selectedPlacedTowerId: instanceId,
+        fusionSourceTowerId: null,
+        placingTowerId: null,
         energy: state.energy - towerTemplate.placeCost,
-        message: `${towerTemplate.name} установлена и выбрана. Режим установки выключен.`,
+        message: `${tower.name} установлена. Режим установки выключен.`,
       };
     }
 
-    case 'UPGRADE_SELECTED_TOWER': {
-      const selectedTower = state.towers.find(
-        (tower) => tower.instanceId === state.selectedPlacedTowerId,
-      );
+    case 'START_FUSION': {
+      const selectedTower = getSelectedTower(state);
 
       if (!selectedTower) {
         return { ...state, message: 'Сначала выберите установленную башню.' };
       }
 
-      const upgradeCost = getTowerUpgradeCost(selectedTower);
+      return {
+        ...state,
+        placingTowerId: null,
+        fusionSourceTowerId: selectedTower.instanceId,
+        message: 'Выберите вторую совместимую башню для слияния.',
+      };
+    }
 
-      if (upgradeCost === null) {
-        return { ...state, message: 'Эта башня уже достигла максимального уровня.' };
+    case 'CANCEL_FUSION':
+      return {
+        ...state,
+        fusionSourceTowerId: null,
+        message: 'Слияние отменено.',
+      };
+
+    case 'FUSE_WITH_TOWER': {
+      const source = state.towers.find((tower) => tower.instanceId === state.fusionSourceTowerId);
+      const target = state.towers.find((tower) => tower.instanceId === action.instanceId);
+
+      if (!source || !target) {
+        return { ...state, message: 'Для слияния нужны две выбранные башни.' };
       }
 
-      if (state.energy < upgradeCost) {
+      if (!canFuseTowers(source, target)) {
         return {
           ...state,
-          message: `Для улучшения требуется ${upgradeCost} энергии.`,
+          selectedPlacedTowerId: target.instanceId,
+          message: 'Эти башни пока нельзя соединить. В v0.5.0 работают чистые пары и усиление гибрида чистым цветом.',
         };
       }
 
-      const upgradedTower = upgradeTower(selectedTower, upgradeCost);
+      const fusionCost = getFusionCost(source, target);
+
+      if (state.energy < fusionCost) {
+        return {
+          ...state,
+          selectedPlacedTowerId: source.instanceId,
+          message: `Для слияния требуется ${fusionCost} энергии.`,
+        };
+      }
+
+      const fusedTower = fuseTowers(source, target, fusionCost);
+
+      if (!fusedTower) {
+        return { ...state, message: 'Слияние не удалось.' };
+      }
 
       return {
         ...state,
-        towers: state.towers.map((tower) =>
-          tower.instanceId === upgradedTower.instanceId ? upgradedTower : tower,
-        ),
-        energy: state.energy - upgradeCost,
-        message: `${upgradedTower.name} улучшена до уровня ${upgradedTower.level}.`,
+        towers: state.towers
+          .filter((tower) => tower.instanceId !== source.instanceId && tower.instanceId !== target.instanceId)
+          .concat(fusedTower),
+        selectedPlacedTowerId: fusedTower.instanceId,
+        fusionSourceTowerId: null,
+        energy: state.energy - fusionCost,
+        message: `Слияние завершено: ${fusedTower.name}.`,
       };
     }
 
     case 'SELL_SELECTED_TOWER': {
-      const selectedTower = state.towers.find(
-        (tower) => tower.instanceId === state.selectedPlacedTowerId,
-      );
+      const selectedTower = getSelectedTower(state);
 
       if (!selectedTower) {
         return { ...state, message: 'Сначала выберите установленную башню.' };
       }
 
-      const refund = getTowerSellRefund(selectedTower);
+      const refund = Math.floor(selectedTower.investedEnergy * 0.6);
 
       return {
         ...state,
-        towers: state.towers.filter(
-          (tower) => tower.instanceId !== selectedTower.instanceId,
-        ),
+        towers: state.towers.filter((tower) => tower.instanceId !== selectedTower.instanceId),
         selectedPlacedTowerId: null,
-        placementMode: false,
+        fusionSourceTowerId: null,
         energy: state.energy + refund,
         message: `${selectedTower.name} продана. Возвращено ${refund} энергии.`,
       };
     }
+
+    case 'TOGGLE_FUSION_ATLAS':
+      return {
+        ...state,
+        showFusionAtlas: !state.showFusionAtlas,
+      };
 
     case 'START_WAVE': {
       if (state.status === 'running' || state.wave >= TOTAL_WAVES) {
@@ -274,32 +377,9 @@ export function battleReducer(
         cooldownRemaining: Math.max(0, tower.cooldownRemaining - action.delta),
       }));
 
-      for (const tower of towers) {
-        if (tower.cooldownRemaining > 0) {
-          continue;
-        }
-
-        const targets = enemies.filter(
-          (enemy) => enemy.hp > 0 && getDistance(tower, enemy) <= tower.range,
-        );
-
-        if (targets.length === 0) {
-          continue;
-        }
-
-        if (tower.attackType === 'aura') {
-          for (const target of targets) {
-            target.hp -= tower.damage;
-          }
-        } else {
-          const target = targets.reduce((leader, candidate) =>
-            candidate.progress > leader.progress ? candidate : leader,
-          );
-          target.hp -= tower.damage;
-        }
-
-        tower.cooldownRemaining = tower.cooldown;
-      }
+      const attackedTowers = towers.map((tower) =>
+        tower.cooldownRemaining > 0 ? tower : attackWithTower(tower, enemies),
+      );
 
       let energy = state.energy;
       let kills = state.kills;
@@ -318,7 +398,7 @@ export function battleReducer(
         if (state.wave >= TOTAL_WAVES) {
           return {
             ...state,
-            towers,
+            towers: attackedTowers,
             enemies: [],
             energy,
             baseHealth,
@@ -332,7 +412,7 @@ export function battleReducer(
 
         return {
           ...state,
-          towers,
+          towers: attackedTowers,
           enemies: [],
           energy: energy + 25,
           baseHealth,
@@ -346,7 +426,7 @@ export function battleReducer(
 
       return {
         ...state,
-        towers,
+        towers: attackedTowers,
         enemies: survivors,
         energy,
         baseHealth,
