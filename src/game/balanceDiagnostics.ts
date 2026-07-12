@@ -75,11 +75,37 @@ function validateRoute(seed: number) {
   return errors;
 }
 
+function validateCubeBlocks(routeSeed: number) {
+  const errors: string[] = [];
+
+  for (let blockStart = 1; blockStart <= 26; blockStart += 5) {
+    const plans = Array.from({ length: 5 }, (_, index) =>
+      getWavePlan(blockStart + index, routeSeed),
+    );
+    const faces = plans.flatMap((plan) => plan.cubeFaces);
+
+    if (faces.length < 3 || faces.length > 10) {
+      errors.push(
+        `seed ${routeSeed}, волны ${blockStart}–${blockStart + 4}: кубиков ${faces.length}, ожидалось 3–10`,
+      );
+    }
+
+    if (faces.some((face) => face < 1 || face > 6)) {
+      errors.push(
+        `seed ${routeSeed}, волны ${blockStart}–${blockStart + 4}: найдена недопустимая грань`,
+      );
+    }
+  }
+
+  return errors;
+}
+
 export function runBalanceDiagnostics(sampleCount = 500): BalanceDiagnosticsResult {
   const errors: string[] = [];
 
   for (let seed = 1; seed <= sampleCount; seed += 1) {
     errors.push(...validateRoute(seed));
+    errors.push(...validateCubeBlocks(seed));
     if (errors.length >= 8) break;
   }
 

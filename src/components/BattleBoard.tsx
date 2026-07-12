@@ -5,11 +5,8 @@ import {
   getEntityPosition,
   getPathPosition,
 } from '../game/battleGeometry';
-import {
-  canFuseTowers,
-  getCompositionSegments,
-  getFusionCost,
-} from '../game/fusionLogic';
+import { canSuperFuseTowers } from '../game/fusionEconomy';
+import { getCompositionSegments } from '../game/fusionLogic';
 import { getPathCellKeys } from '../game/routeGeneration';
 import type { BattleDispatch, BattleState } from '../types/Battle';
 import { BattleEffects } from './BattleEffects';
@@ -28,22 +25,25 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
   const selectedTower = state.towers.find(
     (tower) => tower.instanceId === state.selectedPlacedTowerId,
   );
-  const fusionSourceTower = state.towers.find(
+  const superFusionSource = state.towers.find(
     (tower) => tower.instanceId === state.fusionSourceTowerId,
   );
-  const fusionTargets = fusionSourceTower
-    ? state.towers.filter((tower) => canFuseTowers(fusionSourceTower, tower))
+  const superFusionTargets = superFusionSource
+    ? state.towers.filter((tower) => canSuperFuseTowers(superFusionSource, tower))
     : [];
+  const superFusionTargetIds = new Set(
+    superFusionTargets.map((tower) => tower.instanceId),
+  );
   const routeStart = state.route[0];
   const routeEnd = state.route[state.route.length - 1];
 
   return (
     <div className="battle-board" style={boardStyle}>
-      {fusionSourceTower && (
-        <div className="fusion-board-guide" role="status">
-          <strong>Слияние: шаг 2 из 2</strong>
+      {superFusionSource && (
+        <div className="fusion-board-guide fusion-board-guide--super" role="status">
+          <strong>🧬 Суперслияние: шаг 2 из 2</strong>
           <span>
-            Нажмите на подсвеченную башню. Цена указана рядом с каждой целью.
+            Выберите любую башню уровня {superFusionSource.level}, отмеченную значком 🧬.
           </span>
         </div>
       )}
@@ -55,20 +55,13 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         const occupiedTower = state.towers.find(
           (tower) => tower.x === x && tower.y === y,
         );
-        const isFusionTarget = Boolean(
-          fusionSourceTower &&
-          occupiedTower &&
-          fusionSourceTower.instanceId !== occupiedTower.instanceId &&
-          canFuseTowers(fusionSourceTower, occupiedTower),
+        const isSuperFusionTarget = Boolean(
+          occupiedTower && superFusionTargetIds.has(occupiedTower.instanceId),
         );
-        const fusionCost = isFusionTarget && fusionSourceTower && occupiedTower
-          ? getFusionCost(fusionSourceTower, occupiedTower)
-          : null;
-        const isAffordable = fusionCost !== null && fusionCost <= state.energy;
 
         return (
           <button
-            className={`board-cell${isPathCell ? ' board-cell--path' : ''}${occupiedTower ? ' board-cell--occupied' : ''}${isFusionTarget ? ' board-cell--fusion-target' : ''}${isFusionTarget && !isAffordable ? ' board-cell--fusion-unaffordable' : ''}`}
+            className={`board-cell${isPathCell ? ' board-cell--path' : ''}${occupiedTower ? ' board-cell--occupied' : ''}${isSuperFusionTarget ? ' board-cell--super-fusion-target' : ''}`}
             disabled={
               isPathCell ||
               state.status === 'victory' ||
@@ -79,10 +72,8 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
             type="button"
             aria-label={
               occupiedTower
-                ? `${occupiedTower.name}, клетка ${x + 1}:${y + 1}${
-                    fusionCost !== null
-                      ? `, слияние стоит ${fusionCost} энергии`
-                      : ''
+                ? `${occupiedTower.name}, уровень ${occupiedTower.level}, клетка ${x + 1}:${y + 1}${
+                    isSuperFusionTarget ? ', доступна для суперслияния' : ''
                   }`
                 : isPathCell
                   ? `Дорога, клетка ${x + 1}:${y + 1}`
@@ -129,6 +120,7 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
       {state.towers.map((tower) => {
         const isSelected = tower.instanceId === state.selectedPlacedTowerId;
         const isFusionSource = tower.instanceId === state.fusionSourceTowerId;
+        const isSuperTarget = superFusionTargetIds.has(tower.instanceId);
         const segments = getCompositionSegments(tower.composition);
         const cooldownProgress = tower.cooldown <= 0
           ? 100
@@ -140,16 +132,21 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         return (
           <div
             aria-hidden="true"
-            className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}${isFusionSource ? ' placed-tower--fusion-source' : ''}`}
+            className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}${isFusionSource ? ' placed-tower--fusion-source' : ''}${isSuperTarget ? ' placed-tower--super-target' : ''}`}
             key={tower.instanceId}
             style={{
               ...getEntityPosition(tower.x, tower.y),
               borderColor: tower.color,
               boxShadow: `0 0 18px ${tower.color}66`,
             }}
-            title={`${tower.name}: ранг ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
+            title={`${tower.name}: уровень ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
           >
             <span style={{ color: tower.color }}>{tower.symbol}</span>
+            {isSuperTarget && (
+              <span className="super-fusion-marker" title="Доступна для суперслияния">
+                🧬
+              </span>
+            )}
             <span className="tower-mini-composition">
               {segments.map((colorId, segmentIndex) => (
                 <i
@@ -165,34 +162,17 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         );
       })}
 
-      {fusionSourceTower && fusionTargets.map((target) => {
-        const cost = getFusionCost(fusionSourceTower, target);
-        const isAffordable = cost <= state.energy;
-
-        return (
-          <span
-            aria-hidden="true"
-            className={`fusion-cost-badge${
-              isAffordable ? '' : ' fusion-cost-badge--insufficient'
-            }`}
-            key={`fusion-cost-${target.instanceId}`}
-            style={getEntityPosition(target.x, target.y)}
-          >
-            {cost} ⚡
-          </span>
-        );
-      })}
-
       {state.enemies.map((enemy) => {
         const position = getPathPosition(enemy.progress, state.route);
         const hpPercent = Math.max(0, (enemy.hp / enemy.maxHp) * 100);
+        const hpLabel = `${Math.max(0, Math.ceil(enemy.hp))}`;
 
         return (
           <div
             className={`battle-enemy battle-enemy--${enemy.archetype}`}
             key={enemy.instanceId}
             style={getEntityPosition(position.x, position.y)}
-            title={`${enemy.name}: ${Math.max(0, Math.ceil(enemy.hp))} HP · урон базе ${enemy.baseDamage}`}
+            title={`${enemy.name}: ${hpLabel} HP · урон базе ${enemy.baseDamage}`}
           >
             <div className="enemy-health">
               <span style={{ width: `${hpPercent}%` }} />
@@ -200,6 +180,7 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
             <span className="enemy-symbol" style={{ color: enemy.color }}>
               {enemy.symbol}
             </span>
+            <small className="enemy-hp-label">{hpLabel} HP</small>
           </div>
         );
       })}

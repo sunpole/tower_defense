@@ -32,6 +32,8 @@ export type BalanceAction =
   | { type: 'RESTART_SAME_ROUTE' }
   | { type: 'DEBUG_SET_NEXT_WAVE'; wave: number }
   | { type: 'DEBUG_ADD_ENERGY'; amount: number }
+  | { type: 'DEBUG_ADD_FUSION_POINTS'; amount: number }
+  | { type: 'DEBUG_ADD_SUPER_FUSION_POINTS'; amount: number }
   | { type: 'DEBUG_RESTORE_BASE' };
 
 export type BalanceDispatch = Dispatch<BalanceAction>;
@@ -224,6 +226,20 @@ export function balanceLabReducer(
         message: `Debug: добавлено ${Math.max(0, action.amount)} энергии.`,
       };
 
+    case 'DEBUG_ADD_FUSION_POINTS':
+      return {
+        ...state,
+        fusionPoints: state.fusionPoints + Math.max(0, action.amount),
+        message: `Debug: добавлено ${Math.max(0, action.amount)} очков слияния.`,
+      };
+
+    case 'DEBUG_ADD_SUPER_FUSION_POINTS':
+      return {
+        ...state,
+        superFusionPoints: state.superFusionPoints + Math.max(0, action.amount),
+        message: `Debug: добавлено ${Math.max(0, action.amount)} очков суперслияния.`,
+      };
+
     case 'DEBUG_RESTORE_BASE':
       return {
         ...state,
@@ -238,8 +254,8 @@ export function balanceLabReducer(
         action.type === 'PLACE_TOWER' &&
         next.towers.length > state.towers.length;
       const fusionSucceeded =
-        next.towers.length < state.towers.length &&
-        next.energy < state.energy;
+        (action.type === 'RANDOM_FUSION' || action.type === 'SUPER_FUSE_WITH_TOWER') &&
+        next.towers.length < state.towers.length;
 
       return {
         ...next,

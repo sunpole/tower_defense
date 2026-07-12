@@ -7,7 +7,7 @@ interface BattleStatusBarsProps {
 }
 
 export function BattleStatusBars({ state }: BattleStatusBarsProps) {
-  const wavePlan = state.wave > 0 ? getWavePlan(state.wave) : null;
+  const wavePlan = state.wave > 0 ? getWavePlan(state.wave, state.routeSeed) : null;
   const waveTotal = wavePlan ? getWaveEnemyCount(wavePlan) : 0;
   const waveRemaining = state.enemies.length + state.spawnRemaining;
   const waveDefeated = Math.max(0, waveTotal - waveRemaining);
@@ -54,7 +54,7 @@ export function BattleStatusBars({ state }: BattleStatusBarsProps) {
           <strong>Волна {state.wave || '—'}</strong>
           <span>
             {waveTotal > 0
-              ? `Уничтожено ${waveDefeated} из ${waveTotal}`
+              ? `Прогресс ${Math.round(wavePercent)}%`
               : 'Подготовка к первой волне'}
           </span>
         </div>

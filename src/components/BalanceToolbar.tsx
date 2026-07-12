@@ -95,6 +95,18 @@ export function BalanceToolbar({
             +500 энергии
           </button>
           <button
+            onClick={() => dispatch({ type: 'DEBUG_ADD_FUSION_POINTS', amount: 10 })}
+            type="button"
+          >
+            +10 🎲
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'DEBUG_ADD_SUPER_FUSION_POINTS', amount: 3 })}
+            type="button"
+          >
+            +3 🧬
+          </button>
+          <button
             onClick={() => dispatch({ type: 'DEBUG_RESTORE_BASE' })}
             type="button"
           >

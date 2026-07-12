@@ -16,6 +16,8 @@ export interface BalanceSessionSummary {
   miniBossKills: number;
   bossKills: number;
   remainingEnergy: number;
+  remainingFusionPoints: number;
+  remainingSuperFusionPoints: number;
   remainingBaseHealth: number;
   elapsedMs: number;
   completedAt: string;
@@ -86,6 +88,8 @@ export function buildSessionSummary(
     miniBossKills: state.miniBossKills,
     bossKills: state.bossKills,
     remainingEnergy: state.energy,
+    remainingFusionPoints: state.fusionPoints,
+    remainingSuperFusionPoints: state.superFusionPoints,
     remainingBaseHealth: state.baseHealth,
     elapsedMs: state.elapsedMs,
     completedAt: new Date().toISOString(),

@@ -10,6 +10,7 @@ export type EnemyArchetypeId =
   | 'swift'
   | 'brute'
   | 'elite'
+  | 'cube'
   | 'miniBoss'
   | 'boss';
 export type BattleEffectKind = 'projectile' | 'laser' | 'aura';
@@ -20,6 +21,8 @@ export interface BattleEnemy extends IEnemy {
   baseDamage: number;
   maxHp: number;
   progress: number;
+  cubeFace?: number;
+  fusionPointReward?: number;
 }
 
 export interface BattleEffect {
@@ -67,6 +70,8 @@ export interface BattleState {
   routeThreatMultiplier: number;
   routeRewardMultiplier: number;
   energy: number;
+  fusionPoints: number;
+  superFusionPoints: number;
   baseHealth: number;
   wave: number;
   status: BattleStatus;
@@ -81,9 +86,10 @@ export type BattleAction =
   | { type: 'SELECT_PLACED_TOWER'; instanceId: string }
   | { type: 'CLEAR_SELECTION' }
   | { type: 'PLACE_TOWER'; x: number; y: number }
-  | { type: 'START_FUSION' }
-  | { type: 'CANCEL_FUSION' }
-  | { type: 'FUSE_WITH_TOWER'; instanceId: string }
+  | { type: 'RANDOM_FUSION' }
+  | { type: 'START_SUPER_FUSION' }
+  | { type: 'CANCEL_SUPER_FUSION' }
+  | { type: 'SUPER_FUSE_WITH_TOWER'; instanceId: string }
   | { type: 'SELL_SELECTED_TOWER' }
   | { type: 'TOGGLE_FUSION_ATLAS' }
   | { type: 'START_WAVE' }

@@ -39,8 +39,10 @@ export function BattleSummary({
           <div><span>Время</span><strong>{formatElapsedTime(summary.elapsedMs)}</strong></div>
           <div><span>Установлено башен</span><strong>{summary.placements}</strong></div>
           <div><span>Слияний</span><strong>{summary.fusions}</strong></div>
-          <div><span>Максимальный ранг</span><strong>{summary.highestRank}</strong></div>
+          <div><span>Максимальный уровень</span><strong>{summary.highestRank}</strong></div>
           <div><span>Энергия</span><strong>{summary.remainingEnergy}</strong></div>
+          <div><span>Очки слияния</span><strong>{summary.remainingFusionPoints} 🎲</strong></div>
+          <div><span>Суперслияние</span><strong>{summary.remainingSuperFusionPoints} 🧬</strong></div>
           <div><span>Мини-боссов</span><strong>{summary.miniBossKills}</strong></div>
           <div><span>Больших боссов</span><strong>{summary.bossKills}</strong></div>
           <div><span>HP базы</span><strong>{summary.remainingBaseHealth}</strong></div>
