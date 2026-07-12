@@ -73,4 +73,16 @@ export const ENEMIES: IEnemy[] = [
     dropChance: 1,
     description: 'Главный босс десятой волны: огромный запас здоровья и тяжёлый удар по базе.',
   },
+  {
+    id: 7,
+    name: 'Кубик судьбы',
+    color: '#ffffff',
+    symbol: '⚀',
+    hp: 70,
+    speed: 0.84,
+    rewardEnergy: 0,
+    currencyDrop: 0,
+    dropChance: 1,
+    description: 'Скрытый бонусный враг. Грань определяет здоровье, скорость и награду очками слияния.',
+  },
 ];
