@@ -8,6 +8,7 @@ import './stableWorkspace.css';
 import './fullscreenWorkspace.css';
 import './livingRoute.css';
 import './balanceLab.css';
+import './uiPolish.css';
 import { Battle } from './components/Battle';
 
 function App() {
