@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+import { runBalanceDiagnostics } from '../game/balanceDiagnostics';
 import type {
   BalanceBattleState,
   BalanceDispatch,
@@ -19,6 +21,10 @@ export function BalanceToolbar({
   debugMode,
 }: BalanceToolbarProps) {
   const isRunning = state.status === 'running';
+  const diagnostics = useMemo(
+    () => (debugMode ? runBalanceDiagnostics(500) : null),
+    [debugMode],
+  );
 
   return (
     <section className="balance-toolbar" aria-label="Управление скоростью боя">
@@ -61,6 +67,16 @@ export function BalanceToolbar({
       {debugMode && (
         <div className="balance-debug" aria-label="Режим разработчика">
           <strong>DEBUG</strong>
+          {diagnostics && (
+            <span
+              className={`balance-debug__diagnostics${diagnostics.passed ? ' balance-debug__diagnostics--passed' : ' balance-debug__diagnostics--failed'}`}
+              title={diagnostics.errors.join('\n') || 'Ошибок не найдено'}
+            >
+              {diagnostics.passed
+                ? `Маршруты: ${diagnostics.checkedRoutes}/${diagnostics.checkedRoutes} ✓`
+                : `Ошибки маршрутов: ${diagnostics.errors.length}`}
+            </span>
+          )}
           <span>Следующая волна:</span>
           {DEBUG_WAVES.map((wave) => (
             <button
