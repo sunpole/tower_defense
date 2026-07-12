@@ -18,6 +18,7 @@ export type BattleStatus = 'idle' | 'running' | 'victory' | 'defeat';
 
 export interface BattleState {
   selectedTowerId: number;
+  placementMode: boolean;
   selectedPlacedTowerId: string | null;
   towers: BattleTower[];
   enemies: BattleEnemy[];
@@ -34,6 +35,7 @@ export interface BattleState {
 export type BattleAction =
   | { type: 'SELECT_TOWER'; towerId: number }
   | { type: 'SELECT_PLACED_TOWER'; instanceId: string }
+  | { type: 'CLEAR_SELECTION' }
   | { type: 'PLACE_TOWER'; x: number; y: number }
   | { type: 'UPGRADE_SELECTED_TOWER' }
   | { type: 'SELL_SELECTED_TOWER' }
