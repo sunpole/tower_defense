@@ -14,7 +14,7 @@ export const TOWERS: ITower[] = [
         projectileSpeed: 5,
         cost: 10,
         placeCost: 50,
-        description: 'Стреляет пульками по одному врагу.'
+        description: 'Точный снаряд по одной основной цели.'
     },
     {
         id: 2,
@@ -28,7 +28,7 @@ export const TOWERS: ITower[] = [
         cooldown: 600,
         cost: 10,
         placeCost: 50,
-        description: 'Бьёт лазером, высокая скорость атаки.'
+        description: 'Быстрый лазер с мгновенным попаданием.'
     },
     {
         id: 3,
@@ -42,6 +42,6 @@ export const TOWERS: ITower[] = [
         cooldown: 1200,
         cost: 10,
         placeCost: 50,
-        description: 'Периодический урон по области.'
+        description: 'Импульсом поражает всех врагов внутри своего круга.'
     }
 ];

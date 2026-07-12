@@ -1,0 +1,115 @@
+@media (min-width: 1500px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  .game-app--workspace {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    min-height: 0;
+    margin: 0;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  .game-app--workspace .game-header {
+    flex: 0 0 auto;
+    min-height: 0;
+    margin-bottom: 10px;
+  }
+
+  .game-workspace {
+    flex: 1 1 auto;
+    grid-template-columns:
+      clamp(420px, 30vw, 760px)
+      minmax(640px, 1fr)
+      clamp(380px, 25vw, 640px);
+    gap: 12px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .game-atlas-column,
+  .battle-card--workspace,
+  .game-right-column,
+  .fusion-atlas-panel,
+  .game-right-column > .tower-shop,
+  .game-right-column > .tower-inspector {
+    min-height: 0;
+  }
+
+  .game-atlas-column,
+  .battle-card--workspace,
+  .game-right-column {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .fusion-atlas-panel {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .fusion-atlas-scroll,
+  .game-right-column > .tower-inspector {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    touch-action: pan-y;
+  }
+
+  .fusion-atlas-grid--single-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  .fusion-atlas-panel .fusion-atlas-card {
+    min-width: 0;
+  }
+
+  .game-right-column {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .game-right-column > .tower-shop {
+    width: 100%;
+  }
+
+  .tower-shop--persistent .tower-option {
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .tower-shop--persistent .tower-option__symbol {
+    width: 40px;
+    font-size: 22px;
+  }
+
+  .tower-shop--persistent .tower-option__content strong {
+    font-size: 14px;
+  }
+
+  .tower-shop--persistent .tower-option__content small {
+    font-size: 11px;
+  }
+
+  .tower-shop--persistent .tower-option__stats,
+  .tower-option__availability {
+    font-size: 10px;
+  }
+}

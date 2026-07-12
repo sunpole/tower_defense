@@ -1,29 +1,39 @@
 import type { CSSProperties } from 'react';
 import { TOWERS } from '../config/towers';
-import type { BattleDispatch } from '../types/Battle';
+import type { BattleDispatch, BattleState } from '../types/Battle';
 
 interface TowerShopProps {
-  selectedTowerId: number;
+  state: BattleState;
   dispatch: BattleDispatch;
 }
 
-export function TowerShop({ selectedTowerId, dispatch }: TowerShopProps) {
-  const selectedTower = TOWERS.find((tower) => tower.id === selectedTowerId);
+export function TowerShop({ state, dispatch }: TowerShopProps) {
+  const selectedTower = TOWERS.find((tower) => tower.id === state.selectedTowerId);
 
   return (
-    <aside className="tower-shop" aria-label="Выбор башен">
+    <aside className="tower-shop tower-shop--persistent" aria-label="Выбор башен">
       <div className="tower-shop__heading">
         <p className="eyebrow">Арсенал</p>
-        <h2>Выберите башню</h2>
+        <h2>Магазин башен</h2>
+        <span className="tower-shop__balance">Доступно: {state.energy} энергии</span>
       </div>
 
       <div className="tower-list">
         {TOWERS.map((tower) => {
-          const isSelected = tower.id === selectedTowerId;
+          const isSelected = tower.id === state.placingTowerId;
+          const canAfford = state.energy >= tower.placeCost;
+          const isGameOver = state.status === 'victory' || state.status === 'defeat';
+          const isDisabled = !canAfford || isGameOver;
 
           return (
             <button
-              className={`tower-option${isSelected ? ' tower-option--selected' : ''}`}
+              aria-label={
+                canAfford
+                  ? `${tower.name}, купить за ${tower.placeCost} энергии`
+                  : `${tower.name}, не хватает ${tower.placeCost - state.energy} энергии`
+              }
+              className={`tower-option${isSelected ? ' tower-option--selected' : ''}${isDisabled ? ' tower-option--unavailable' : ''}`}
+              disabled={isDisabled}
               key={tower.id}
               onClick={() => dispatch({ type: 'SELECT_TOWER', towerId: tower.id })}
               style={{ '--tower-color': tower.color } as CSSProperties}
@@ -36,23 +46,24 @@ export function TowerShop({ selectedTowerId, dispatch }: TowerShopProps) {
                 <span className="tower-option__stats">
                   Урон {tower.damage} · Радиус {tower.range} · Цена {tower.placeCost}
                 </span>
+                <span className={`tower-option__availability${canAfford ? '' : ' is-insufficient'}`}>
+                  {canAfford
+                    ? 'Доступна для установки'
+                    : `Не хватает ${tower.placeCost - state.energy} энергии`}
+                </span>
               </span>
             </button>
           );
         })}
       </div>
 
-      {selectedTower && (
-        <div className="selection-note">
-          Сейчас выбрана: <strong>{selectedTower.name}</strong>
-        </div>
-      )}
-
-      <ol className="game-help">
-        <li>Выберите башню.</li>
-        <li>Нажмите на свободную клетку рядом с дорогой.</li>
-        <li>Запустите волну и не дайте врагам добраться до базы.</li>
-      </ol>
+      <div className="selection-note">
+        {state.placingTowerId && selectedTower ? (
+          <>Режим установки: <strong>{selectedTower.name}</strong></>
+        ) : (
+          <>Выберите доступную башню, затем нажмите на свободную клетку.</>
+        )}
+      </div>
     </aside>
   );
 }

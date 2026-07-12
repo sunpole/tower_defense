@@ -1,0 +1,97 @@
+.wave-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #303444;
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: rgba(17, 20, 27, 0.9);
+  text-align: left;
+}
+
+.wave-preview--низкая {
+  border-left-color: #86efac;
+}
+
+.wave-preview--средняя {
+  border-left-color: #7dd3fc;
+}
+
+.wave-preview--высокая {
+  border-left-color: #fbbf24;
+}
+
+.wave-preview--критическая {
+  border-left-color: #fb7185;
+}
+
+.wave-preview > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.wave-preview__eyebrow {
+  color: #8f96a8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wave-preview strong {
+  color: #f7f8fb;
+  font-size: 15px;
+}
+
+.wave-preview small {
+  color: #a5acbc;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wave-preview dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(54px, auto));
+  gap: 6px;
+  margin: 0;
+}
+
+.wave-preview dl div {
+  min-width: 54px;
+  padding: 7px 8px;
+  border: 1px solid #303444;
+  border-radius: 8px;
+  background: #0f1219;
+}
+
+.wave-preview dt,
+.wave-preview dd {
+  margin: 0;
+}
+
+.wave-preview dt {
+  color: #7f8799;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.wave-preview dd {
+  margin-top: 2px;
+  color: #f4f5f8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .wave-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .wave-preview dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
