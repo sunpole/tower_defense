@@ -1,0 +1,170 @@
+.battle-effects {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.battle-effects__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.combat-effect line,
+.combat-effect circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.combat-effect--projectile line {
+  stroke-width: 2.2px;
+  stroke-linecap: round;
+  stroke-dasharray: 7 18;
+  filter: drop-shadow(0 0 3px currentColor);
+  animation: combat-projectile 380ms ease-out both;
+}
+
+.combat-effect--laser line {
+  stroke-width: 2px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px currentColor);
+  animation: combat-laser 240ms ease-out both;
+}
+
+.combat-effect--aura > circle:first-child {
+  fill: none;
+  stroke-width: 2px;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: combat-aura 460ms ease-out both;
+}
+
+.combat-effect__core {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: combat-core 360ms ease-out both;
+}
+
+.combat-effect__impact {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: combat-impact 320ms ease-out both;
+}
+
+.combat-effect__label {
+  position: absolute;
+  z-index: 8;
+  max-width: 150px;
+  padding: 3px 7px;
+  border: 1px solid;
+  border-radius: 999px;
+  background: rgba(11, 14, 21, 0.9);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  transform: translate(-50%, -155%);
+  animation: combat-label 520ms ease-out both;
+}
+
+.battle-enemy--swift {
+  transform: translate(-50%, -50%) scale(0.82);
+}
+
+.battle-enemy--brute {
+  transform: translate(-50%, -50%) scale(1.16);
+}
+
+.battle-enemy--elite {
+  transform: translate(-50%, -50%) scale(1.24);
+  filter: drop-shadow(0 0 7px rgba(251, 113, 133, 0.45));
+}
+
+@keyframes combat-projectile {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 34;
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes combat-laser {
+  0% {
+    opacity: 0;
+    stroke-width: 4px;
+  }
+  24% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 1px;
+  }
+}
+
+@keyframes combat-aura {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+@keyframes combat-core {
+  0% {
+    opacity: 0.8;
+    transform: scale(0.45);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+@keyframes combat-impact {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.5);
+  }
+}
+
+@keyframes combat-label {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -95%) scale(0.92);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-effect,
+  .combat-effect__label {
+    animation-duration: 1ms !important;
+  }
+}
