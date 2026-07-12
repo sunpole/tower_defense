@@ -7,61 +7,77 @@ interface TowerShopProps {
   dispatch: BattleDispatch;
 }
 
+function getCompactTowerName(name: string) {
+  return name.replace(/\s+башня$/i, '');
+}
+
+function getAttackRole(attackType: string) {
+  if (attackType === 'aura') return 'Импульс';
+  if (attackType === 'laser') return 'Лазер';
+  return 'Снаряд';
+}
+
 export function TowerShop({ state, dispatch }: TowerShopProps) {
   const selectedTower = TOWERS.find((tower) => tower.id === state.selectedTowerId);
 
   return (
-    <aside className="tower-shop tower-shop--persistent" aria-label="Выбор башен">
-      <div className="tower-shop__heading">
-        <p className="eyebrow">Арсенал</p>
-        <h2>Магазин башен</h2>
-        <span className="tower-shop__balance">Доступно: {state.energy} энергии</span>
+    <aside className="tower-shop tower-shop--persistent tower-shop--compact" aria-label="Выбор башен">
+      <div className="tower-shop__heading tower-shop__heading--compact">
+        <div>
+          <p className="eyebrow">Арсенал</p>
+          <h2>Башни</h2>
+        </div>
+        <strong className="tower-shop__balance tower-shop__balance--pill">
+          {state.energy} ⚡
+        </strong>
       </div>
 
-      <div className="tower-list">
+      <div className="tower-list tower-list--compact">
         {TOWERS.map((tower) => {
           const isSelected = tower.id === state.placingTowerId;
           const canAfford = state.energy >= tower.placeCost;
           const isGameOver = state.status === 'victory' || state.status === 'defeat';
           const isDisabled = !canAfford || isGameOver;
+          const shortfall = Math.max(0, tower.placeCost - state.energy);
 
           return (
             <button
               aria-label={
                 canAfford
                   ? `${tower.name}, купить за ${tower.placeCost} энергии`
-                  : `${tower.name}, не хватает ${tower.placeCost - state.energy} энергии`
+                  : `${tower.name}, не хватает ${shortfall} энергии`
               }
-              className={`tower-option${isSelected ? ' tower-option--selected' : ''}${isDisabled ? ' tower-option--unavailable' : ''}`}
+              className={`tower-option tower-option--compact${isSelected ? ' tower-option--selected' : ''}${isDisabled ? ' tower-option--unavailable' : ''}`}
               disabled={isDisabled}
               key={tower.id}
               onClick={() => dispatch({ type: 'SELECT_TOWER', towerId: tower.id })}
               style={{ '--tower-color': tower.color } as CSSProperties}
+              title={`${tower.description}. Урон ${tower.damage}, радиус ${tower.range}, цена ${tower.placeCost}.`}
               type="button"
             >
               <span className="tower-option__symbol">{tower.symbol}</span>
-              <span className="tower-option__content">
-                <strong>{tower.name}</strong>
-                <small>{tower.description}</small>
-                <span className="tower-option__stats">
-                  Урон {tower.damage} · Радиус {tower.range} · Цена {tower.placeCost}
-                </span>
-                <span className={`tower-option__availability${canAfford ? '' : ' is-insufficient'}`}>
-                  {canAfford
-                    ? 'Доступна для установки'
-                    : `Не хватает ${tower.placeCost - state.energy} энергии`}
-                </span>
+              <span className="tower-option__compact-name">
+                <strong>{getCompactTowerName(tower.name)}</strong>
+                <small>{getAttackRole(tower.attackType)}</small>
+              </span>
+              <span className="tower-option__compact-stats" aria-hidden="true">
+                <b>У {tower.damage}</b>
+                <b>R {tower.range}</b>
+                <b>{tower.placeCost} ⚡</b>
+              </span>
+              <span className={`tower-option__compact-status${canAfford ? '' : ' is-insufficient'}`}>
+                {canAfford ? (isSelected ? 'Выбрана' : 'Установить') : `−${shortfall} ⚡`}
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="selection-note">
+      <div className={`selection-note selection-note--compact${state.placingTowerId ? ' selection-note--active' : ''}`}>
         {state.placingTowerId && selectedTower ? (
-          <>Режим установки: <strong>{selectedTower.name}</strong></>
+          <>Установка: <strong>{getCompactTowerName(selectedTower.name)}</strong> · выберите клетку</>
         ) : (
-          <>Выберите доступную башню, затем нажмите на свободную клетку.</>
+          <>Выберите цвет, затем свободную клетку.</>
         )}
       </div>
     </aside>

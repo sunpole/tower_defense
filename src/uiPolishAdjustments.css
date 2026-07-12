@@ -1,0 +1,10 @@
+.tower-cooldown {
+  left: -8%;
+  bottom: -14px;
+  width: 116%;
+  height: 3px;
+}
+
+.placed-tower--selected .tower-cooldown {
+  bottom: -16px;
+}
