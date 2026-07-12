@@ -108,6 +108,12 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         const isSelected = tower.instanceId === state.selectedPlacedTowerId;
         const isFusionSource = tower.instanceId === state.fusionSourceTowerId;
         const segments = getCompositionSegments(tower.composition);
+        const cooldownProgress = tower.cooldown <= 0
+          ? 100
+          : Math.min(
+              100,
+              Math.max(0, (1 - tower.cooldownRemaining / tower.cooldown) * 100),
+            );
 
         return (
           <div
@@ -129,6 +135,9 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
                   style={{ background: FUSION_COLORS[colorId].hex }}
                 />
               ))}
+            </span>
+            <span className="tower-cooldown" title="Перезарядка атаки">
+              <i style={{ width: `${cooldownProgress}%` }} />
             </span>
           </div>
         );
