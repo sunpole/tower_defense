@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { FUSION_COLORS, FUSION_RARITIES } from '../config/fusionSystem';
 import {
   canFuseTowers,
@@ -111,7 +111,10 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
 
       <div className="composition-pills" aria-label="Цветовой состав">
         {compositionEntries.map((entry) => (
-          <span key={entry.colorId} style={{ '--composition-color': FUSION_COLORS[entry.colorId].hex } as React.CSSProperties}>
+          <span
+            key={entry.colorId}
+            style={{ '--composition-color': FUSION_COLORS[entry.colorId].hex } as CSSProperties}
+          >
             <b>{FUSION_COLORS[entry.colorId].label}</b>
             {entry.value}/10
           </span>
