@@ -3,6 +3,7 @@ import { battleReducer, createInitialBattleState } from '../game/battleReducer';
 import { useBattleLoop } from '../hooks/useBattleLoop';
 import '../towerManagement.css';
 import '../colorFusion.css';
+import '../fusionUx.css';
 import { BattleBoard } from './BattleBoard';
 import { BattleControls } from './BattleControls';
 import { BattleHeader } from './BattleHeader';
