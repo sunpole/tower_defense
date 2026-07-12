@@ -3,10 +3,28 @@ import type { FusionAbility, FusionComposition, FusionRarityId } from '../config
 import type { IEnemy } from './Enemy';
 import type { IPlacedTower } from './Tower';
 
+export type EnemyArchetypeId = 'normal' | 'swift' | 'brute' | 'elite';
+export type BattleEffectKind = 'projectile' | 'laser' | 'aura';
+
 export interface BattleEnemy extends IEnemy {
   instanceId: string;
+  archetype: EnemyArchetypeId;
+  baseDamage: number;
   maxHp: number;
   progress: number;
+}
+
+export interface BattleEffect {
+  id: string;
+  kind: BattleEffectKind;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  color: string;
+  ttl: number;
+  radius?: number;
+  label?: string;
 }
 
 export interface BattleTower extends IPlacedTower {
@@ -31,6 +49,7 @@ export interface BattleState {
   showFusionAtlas: boolean;
   towers: BattleTower[];
   enemies: BattleEnemy[];
+  effects: BattleEffect[];
   energy: number;
   baseHealth: number;
   wave: number;
