@@ -17,6 +17,9 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
     '--board-columns': BOARD_COLUMNS,
     '--board-rows': BOARD_ROWS,
   } as CSSProperties;
+  const selectedTower = state.towers.find(
+    (tower) => tower.instanceId === state.selectedPlacedTowerId,
+  );
 
   return (
     <div className="battle-board" style={boardStyle}>
@@ -43,20 +46,43 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
         );
       })}
 
-      {state.towers.map((tower) => (
+      {selectedTower && (
         <div
-          className="placed-tower"
-          key={tower.instanceId}
+          className="tower-range"
           style={{
-            ...getEntityPosition(tower.x, tower.y),
-            borderColor: tower.color,
-            boxShadow: `0 0 18px ${tower.color}66`,
+            ...getEntityPosition(selectedTower.x, selectedTower.y),
+            width: `${(selectedTower.range * 2 / BOARD_COLUMNS) * 100}%`,
+            borderColor: selectedTower.color,
+            backgroundColor: `${selectedTower.color}14`,
           }}
-          title={`${tower.name}: урон ${tower.damage}, радиус ${tower.range}`}
-        >
-          <span style={{ color: tower.color }}>{tower.symbol}</span>
-        </div>
-      ))}
+          aria-hidden="true"
+        />
+      )}
+
+      {state.towers.map((tower) => {
+        const isSelected = tower.instanceId === state.selectedPlacedTowerId;
+
+        return (
+          <button
+            aria-label={`${tower.name}, уровень ${tower.level}. Выбрать башню`}
+            aria-pressed={isSelected}
+            className={`placed-tower${isSelected ? ' placed-tower--selected' : ''}`}
+            key={tower.instanceId}
+            onClick={() =>
+              dispatch({ type: 'SELECT_PLACED_TOWER', instanceId: tower.instanceId })
+            }
+            style={{
+              ...getEntityPosition(tower.x, tower.y),
+              borderColor: tower.color,
+              boxShadow: `0 0 18px ${tower.color}66`,
+            }}
+            title={`${tower.name}: уровень ${tower.level}, урон ${tower.damage}, радиус ${tower.range}`}
+            type="button"
+          >
+            <span style={{ color: tower.color }}>{tower.symbol}</span>
+          </button>
+        );
+      })}
 
       {state.enemies.map((enemy) => {
         const position = getPathPosition(enemy.progress);
