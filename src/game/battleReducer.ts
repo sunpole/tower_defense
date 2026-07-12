@@ -14,6 +14,11 @@ import type {
 } from '../types/Battle';
 import { getDistance, PATH_CELL_KEYS } from './battleGeometry';
 import { createEnemy } from './createEnemy';
+import {
+  getTowerSellRefund,
+  getTowerUpgradeCost,
+  upgradeTower,
+} from './towerProgression';
 
 let towerSequence = 0;
 
@@ -22,6 +27,7 @@ export function createInitialBattleState(
 ): BattleState {
   return {
     selectedTowerId,
+    selectedPlacedTowerId: null,
     towers: [],
     enemies: [],
     energy: STARTING_ENERGY,
@@ -44,8 +50,25 @@ export function battleReducer(
       return {
         ...state,
         selectedTowerId: action.towerId,
+        selectedPlacedTowerId: null,
         message: 'Башня выбрана. Нажмите на свободную клетку поля.',
       };
+
+    case 'SELECT_PLACED_TOWER': {
+      const tower = state.towers.find(
+        (candidate) => candidate.instanceId === action.instanceId,
+      );
+
+      if (!tower) {
+        return state;
+      }
+
+      return {
+        ...state,
+        selectedPlacedTowerId: tower.instanceId,
+        message: `${tower.name}, уровень ${tower.level}. Доступны улучшение и продажа.`,
+      };
+    }
 
     case 'PLACE_TOWER': {
       if (state.status === 'victory' || state.status === 'defeat') {
@@ -73,22 +96,81 @@ export function battleReducer(
       }
 
       towerSequence += 1;
+      const instanceId = `tower-${towerSequence}`;
 
       const tower: BattleTower = {
         ...towerTemplate,
-        instanceId: `tower-${towerSequence}`,
+        instanceId,
         x: action.x,
         y: action.y,
         lastShot: 0,
         buffId: null,
         cooldownRemaining: 0,
+        investedEnergy: towerTemplate.placeCost,
       };
 
       return {
         ...state,
         towers: [...state.towers, tower],
+        selectedPlacedTowerId: instanceId,
         energy: state.energy - towerTemplate.placeCost,
-        message: `${towerTemplate.name} установлена.`,
+        message: `${towerTemplate.name} установлена и выбрана.`,
+      };
+    }
+
+    case 'UPGRADE_SELECTED_TOWER': {
+      const selectedTower = state.towers.find(
+        (tower) => tower.instanceId === state.selectedPlacedTowerId,
+      );
+
+      if (!selectedTower) {
+        return { ...state, message: 'Сначала выберите установленную башню.' };
+      }
+
+      const upgradeCost = getTowerUpgradeCost(selectedTower);
+
+      if (upgradeCost === null) {
+        return { ...state, message: 'Эта башня уже достигла максимального уровня.' };
+      }
+
+      if (state.energy < upgradeCost) {
+        return {
+          ...state,
+          message: `Для улучшения требуется ${upgradeCost} энергии.`,
+        };
+      }
+
+      const upgradedTower = upgradeTower(selectedTower, upgradeCost);
+
+      return {
+        ...state,
+        towers: state.towers.map((tower) =>
+          tower.instanceId === upgradedTower.instanceId ? upgradedTower : tower,
+        ),
+        energy: state.energy - upgradeCost,
+        message: `${upgradedTower.name} улучшена до уровня ${upgradedTower.level}.`,
+      };
+    }
+
+    case 'SELL_SELECTED_TOWER': {
+      const selectedTower = state.towers.find(
+        (tower) => tower.instanceId === state.selectedPlacedTowerId,
+      );
+
+      if (!selectedTower) {
+        return { ...state, message: 'Сначала выберите установленную башню.' };
+      }
+
+      const refund = getTowerSellRefund(selectedTower);
+
+      return {
+        ...state,
+        towers: state.towers.filter(
+          (tower) => tower.instanceId !== selectedTower.instanceId,
+        ),
+        selectedPlacedTowerId: null,
+        energy: state.energy + refund,
+        message: `${selectedTower.name} продана. Возвращено ${refund} энергии.`,
       };
     }
 
