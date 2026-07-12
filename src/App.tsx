@@ -10,6 +10,7 @@ import './livingRoute.css';
 import './balanceLab.css';
 import './uiPolish.css';
 import './uiPolishAdjustments.css';
+import './cubeFusion.css';
 import { Battle } from './components/Battle';
 
 function App() {
