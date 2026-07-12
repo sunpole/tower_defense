@@ -7,6 +7,10 @@ import {
   getCompositionSegments,
   getFusionCost,
 } from '../game/fusionLogic';
+import {
+  formatFusionCostRange,
+  getAbilityExactEffect,
+} from '../game/fusionPresentation';
 import type { BattleDispatch, BattleState, BattleTower } from '../types/Battle';
 
 interface TowerInspectorProps {
@@ -22,7 +26,8 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
         <p className="eyebrow">Установленная башня</p>
         <h2>Башня не выбрана</h2>
         <p className="tower-inspector__empty">
-          Нажмите на занятую клетку поля, чтобы увидеть состав, радиус, способности и действия башни.
+          Нажмите на занятую клетку поля, чтобы увидеть состав, радиус,
+          способности и действия башни.
         </p>
       </aside>
     );
@@ -31,19 +36,30 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
   const abilities = getActiveFusionAbilities(tower.composition);
   const rarity = FUSION_RARITIES[tower.fusionRarity];
   const segments = getCompositionSegments(tower.composition);
-  const fusionSource = state.towers.find((candidate) => candidate.instanceId === state.fusionSourceTowerId);
   const isFusionSource = state.fusionSourceTowerId === tower.instanceId;
-  const possibleTargets = fusionSource
-    ? state.towers.filter((candidate) => canFuseTowers(fusionSource, candidate))
-    : [];
-  const previewCost = fusionSource && fusionSource.instanceId !== tower.instanceId && canFuseTowers(fusionSource, tower)
-    ? getFusionCost(fusionSource, tower)
+  const compatibleTargets = state.towers.filter((candidate) =>
+    canFuseTowers(tower, candidate),
+  );
+  const fusionCosts = compatibleTargets.map((candidate) =>
+    getFusionCost(tower, candidate),
+  );
+  const fusionCostRange = formatFusionCostRange(fusionCosts);
+  const minimumFusionCost = fusionCosts.length > 0
+    ? Math.min(...fusionCosts)
     : null;
+  const affordableTargets = fusionCosts.filter((cost) => cost <= state.energy).length;
+  const attackRate = (1000 / tower.cooldown).toFixed(2);
+  const targetsLabel = tower.targetCount >= 99
+    ? 'Все в радиусе'
+    : `${tower.targetCount}`;
 
   return (
     <aside className="tower-inspector" aria-label="Выбранная башня">
       <div className="tower-inspector__heading">
-        <span className="tower-inspector__symbol" style={{ borderColor: tower.color, color: tower.color }}>
+        <span
+          className="tower-inspector__symbol"
+          style={{ borderColor: tower.color, color: tower.color }}
+        >
           {tower.symbol}
         </span>
         <div>
@@ -57,7 +73,10 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
 
       <div className="composition-bar" aria-label={getCompositionLabel(tower.composition)}>
         {segments.map((colorId, index) => (
-          <span key={`${colorId}-${index}`} style={{ background: FUSION_COLORS[colorId].hex }} />
+          <span
+            key={`${colorId}-${index}`}
+            style={{ background: FUSION_COLORS[colorId].hex }}
+          />
         ))}
       </div>
 
@@ -65,12 +84,14 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
         {getCompositionEntries(tower.composition).map((entry) => (
           <div key={entry.colorId}>
             <dt>{FUSION_COLORS[entry.colorId].label}</dt>
-            <dd>{entry.value}/10 · {FUSION_COLORS[entry.colorId].primaryStatLabel}</dd>
+            <dd>
+              {entry.value}/10 · {FUSION_COLORS[entry.colorId].primaryStatLabel}
+            </dd>
           </div>
         ))}
       </dl>
 
-      <dl className="tower-details">
+      <dl className="tower-details tower-details--extended">
         <div>
           <dt>Урон</dt>
           <dd>{tower.damage}</dd>
@@ -82,6 +103,14 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
         <div>
           <dt>Перезарядка</dt>
           <dd>{(tower.cooldown / 1000).toFixed(2)} сек.</dd>
+        </div>
+        <div>
+          <dt>Атак в секунду</dt>
+          <dd>{attackRate}</dd>
+        </div>
+        <div>
+          <dt>Целей</dt>
+          <dd>{targetsLabel}</dd>
         </div>
         <div>
           <dt>Вложено</dt>
@@ -96,25 +125,76 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
             {abilities.map((ability) => (
               <li key={ability.id}>
                 <span>{ability.name}</span>
-                <small>{ability.shortDescription}</small>
+                <small>{ability.fullDescription}</small>
+                <em>{getAbilityExactEffect(ability.id)}</em>
               </li>
             ))}
           </ul>
         ) : (
-          <p>Чистая башня. Соедините её с другим цветом, чтобы открыть синергию.</p>
+          <p>
+            Чистая башня. Соедините её с другим цветом, чтобы открыть
+            цветовую способность.
+          </p>
         )}
       </div>
 
-      {previewCost !== null && (
-        <p className="tower-inspector__warning">
-          Слияние с выбранной исходной башней стоит {previewCost} энергии.
-        </p>
-      )}
+      <div className="fusion-steps" aria-label="Как выполнить слияние">
+        <strong>Как выполнить слияние</strong>
+        <ol>
+          <li className="is-done">Исходная башня выбрана.</li>
+          <li className={isFusionSource ? 'is-done' : 'is-active'}>
+            Нажмите кнопку начала слияния.
+          </li>
+          <li className={isFusionSource ? 'is-active' : ''}>
+            Нажмите на подсвеченную башню. Цена будет написана прямо на поле.
+          </li>
+        </ol>
+      </div>
+
+      <div
+        className={`fusion-budget${
+          compatibleTargets.length > 0 && affordableTargets === 0
+            ? ' fusion-budget--insufficient'
+            : ''
+        }`}
+      >
+        {compatibleTargets.length > 0 && fusionCostRange ? (
+          <>
+            <div>
+              <span>Цена следующего слияния</span>
+              <strong>{fusionCostRange} энергии</strong>
+            </div>
+            <div>
+              <span>Ваш запас</span>
+              <strong>{state.energy} энергии</strong>
+            </div>
+            <p>
+              Совместимых башен: {compatibleTargets.length}. Сейчас доступно по
+              энергии: {affordableTargets}.
+            </p>
+            {minimumFusionCost !== null && state.energy < minimumFusionCost && (
+              <b>
+                Не хватает {minimumFusionCost - state.energy} энергии для самого
+                дешёвого слияния.
+              </b>
+            )}
+          </>
+        ) : (
+          <p>
+            Совместимых башен пока нет. Поставьте чистую башню другого цвета
+            или подходящий цвет для уже созданного гибрида.
+          </p>
+        )}
+      </div>
 
       {isFusionSource && (
-        <p className="tower-inspector__warning">
-          Режим слияния включён. Совместимые башни подсвечены на поле: {possibleTargets.length}.
-        </p>
+        <div className="fusion-mode-notice" role="status">
+          <strong>Режим слияния включён</strong>
+          <span>
+            Совместимые башни подсвечены. Зелёная цена означает, что энергии
+            хватает; красная — что сначала нужно накопить энергию.
+          </span>
+        </div>
       )}
 
       <div className="tower-inspector__actions">
@@ -129,10 +209,13 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
         ) : (
           <button
             className="tower-upgrade-button"
+            disabled={compatibleTargets.length === 0}
             onClick={() => dispatch({ type: 'START_FUSION' })}
             type="button"
           >
-            Начать слияние
+            {fusionCostRange
+              ? `Начать слияние · ${fusionCostRange} энергии`
+              : 'Нет совместимой башни'}
           </button>
         )}
 
@@ -154,7 +237,8 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
       </div>
 
       <p className="tower-inspector__note">
-        Слияние заменяет обычное улучшение. Чем реже состав, тем дороже следующее слияние.
+        Чем реже цветовой состав, тем дороже следующее слияние. Все варианты и
+        точные параметры доступны в атласе.
       </p>
     </aside>
   );
