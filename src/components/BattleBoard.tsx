@@ -4,13 +4,13 @@ import { BOARD_COLUMNS, BOARD_ROWS } from '../config/gameSettings';
 import {
   getEntityPosition,
   getPathPosition,
-  PATH_CELL_KEYS,
 } from '../game/battleGeometry';
 import {
   canFuseTowers,
   getCompositionSegments,
   getFusionCost,
 } from '../game/fusionLogic';
+import { getPathCellKeys } from '../game/routeGeneration';
 import type { BattleDispatch, BattleState } from '../types/Battle';
 import { BattleEffects } from './BattleEffects';
 
@@ -24,6 +24,7 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
     '--board-columns': BOARD_COLUMNS,
     '--board-rows': BOARD_ROWS,
   } as CSSProperties;
+  const pathCellKeys = getPathCellKeys(state.route);
   const selectedTower = state.towers.find(
     (tower) => tower.instanceId === state.selectedPlacedTowerId,
   );
@@ -33,6 +34,8 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
   const fusionTargets = fusionSourceTower
     ? state.towers.filter((tower) => canFuseTowers(fusionSourceTower, tower))
     : [];
+  const routeStart = state.route[0];
+  const routeEnd = state.route[state.route.length - 1];
 
   return (
     <div className="battle-board" style={boardStyle}>
@@ -48,7 +51,7 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
       {Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => {
         const x = index % BOARD_COLUMNS;
         const y = Math.floor(index / BOARD_COLUMNS);
-        const isPathCell = PATH_CELL_KEYS.has(`${x}:${y}`);
+        const isPathCell = pathCellKeys.has(`${x}:${y}`);
         const occupiedTower = state.towers.find(
           (tower) => tower.x === x && tower.y === y,
         );
@@ -88,6 +91,25 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
           />
         );
       })}
+
+      {routeStart && (
+        <span
+          className="route-marker route-marker--start"
+          style={getEntityPosition(routeStart.x, routeStart.y)}
+          aria-hidden="true"
+        >
+          ВХОД
+        </span>
+      )}
+      {routeEnd && (
+        <span
+          className="route-marker route-marker--finish"
+          style={getEntityPosition(routeEnd.x, routeEnd.y)}
+          aria-hidden="true"
+        >
+          БАЗА
+        </span>
+      )}
 
       {selectedTower && (
         <div
@@ -162,7 +184,7 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
       })}
 
       {state.enemies.map((enemy) => {
-        const position = getPathPosition(enemy.progress);
+        const position = getPathPosition(enemy.progress, state.route);
         const hpPercent = Math.max(0, (enemy.hp / enemy.maxHp) * 100);
 
         return (
