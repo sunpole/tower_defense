@@ -7,6 +7,7 @@ import '../fusionUx.css';
 import '../combatEffects.css';
 import '../battleBalance.css';
 import '../stableWorkspace.css';
+import '../fullscreenWorkspace.css';
 import { BattleBoard } from './BattleBoard';
 import { BattleControls } from './BattleControls';
 import { BattleHeader } from './BattleHeader';
