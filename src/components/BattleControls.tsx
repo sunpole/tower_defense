@@ -1,7 +1,7 @@
 import { TOTAL_WAVES } from '../config/gameSettings';
 import {
   formatWaveComposition,
-  getWaveEnemyCount,
+  getVisibleWaveEnemyCount,
   getWavePlan,
 } from '../game/waveBalance';
 import type { BattleDispatch, BattleState } from '../types/Battle';
@@ -16,8 +16,8 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
     state.status === 'running' ? state.wave : state.wave + 1,
     TOTAL_WAVES,
   );
-  const plan = getWavePlan(previewWave);
-  const remainingEnemies = state.enemies.length + state.spawnRemaining;
+  const plan = getWavePlan(previewWave, state.routeSeed);
+  const visibleEnemies = state.enemies.filter((enemy) => enemy.archetype !== 'cube').length;
   const isFinalState = state.status === 'victory' || state.status === 'defeat';
   const routeThreatPercent = Math.round((state.routeThreatMultiplier - 1) * 100);
   const routeThreatLabel = routeThreatPercent === 0
@@ -57,8 +57,8 @@ export function BattleControls({ state, dispatch }: BattleControlsProps) {
               <dd>{plan.threat}</dd>
             </div>
             <div>
-              <dt>{state.status === 'running' ? 'Осталось' : 'Всего'}</dt>
-              <dd>{state.status === 'running' ? remainingEnemies : getWaveEnemyCount(plan)}</dd>
+              <dt>{state.status === 'running' ? 'Основных на поле' : 'Основных'}</dt>
+              <dd>{state.status === 'running' ? visibleEnemies : getVisibleWaveEnemyCount(plan)}</dd>
             </div>
             <div>
               <dt>Здоровье</dt>
