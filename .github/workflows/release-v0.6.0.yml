@@ -1,0 +1,47 @@
+name: Release v0.6.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - PATCH_NOTES/v0.6.0_LIVING_ROUTE.md
+      - .github/workflows/release-v0.6.0.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify package version
+        run: |
+          node -e "const pkg=require('./package.json'); if(pkg.version!=='0.6.0'){console.error('Expected version 0.6.0, got '+pkg.version); process.exit(1)}"
+
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! git rev-parse "refs/tags/v0.6.0" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a v0.6.0 -m "v0.6.0 — Живой маршрут и полигон баланса"
+            git push origin v0.6.0
+          fi
+
+          if gh release view v0.6.0 >/dev/null 2>&1; then
+            echo "Release v0.6.0 already exists."
+            exit 0
+          fi
+
+          gh release create v0.6.0 \
+            --title "v0.6.0 — Живой маршрут и полигон баланса" \
+            --notes-file PATCH_NOTES/v0.6.0_LIVING_ROUTE.md
