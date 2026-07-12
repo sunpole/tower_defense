@@ -19,10 +19,13 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+  width: 100%;
+  min-width: 0;
   padding: 7px;
   border: 1px solid rgba(167, 139, 250, 0.28);
   border-radius: 10px;
   background: rgba(124, 58, 237, 0.07);
+  box-sizing: border-box;
 }
 
 .fusion-wallet__currency {
@@ -91,14 +94,48 @@
 
 .tower-inspector--fusion-hub {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: min-content;
   gap: 8px;
+  align-content: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.tower-inspector--fusion-hub > .fusion-wallet,
+.tower-inspector--fusion-hub > .tower-inspector__empty-hint {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .tower-inspector__empty-hint {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
+  gap: 10px;
   align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(15, 18, 26, 0.48);
+}
+
+.tower-inspector__empty-hint > div:last-child {
+  min-width: 0;
+}
+
+.tower-inspector__empty-hint h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.1;
+}
+
+.tower-inspector__empty-hint .tower-inspector__empty {
+  margin: 4px 0 0;
+  color: #9299aa;
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .super-fusion-console {
@@ -204,5 +241,15 @@
 @media (max-width: 720px) {
   .game-stats--six {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fusion-wallet {
+    grid-template-columns: 1fr;
+  }
+
+  .fusion-wallet__currency,
+  .random-fusion-button,
+  .fusion-wallet > p {
+    grid-column: 1;
   }
 }
