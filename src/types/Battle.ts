@@ -1,9 +1,17 @@
 import type { Dispatch } from 'react';
 import type { FusionAbility, FusionComposition, FusionRarityId } from '../config/fusionSystem';
+import type { GridPoint } from '../config/gameSettings';
+import type { RouteKind } from '../game/routeGeneration';
 import type { IEnemy } from './Enemy';
 import type { IPlacedTower } from './Tower';
 
-export type EnemyArchetypeId = 'normal' | 'swift' | 'brute' | 'elite';
+export type EnemyArchetypeId =
+  | 'normal'
+  | 'swift'
+  | 'brute'
+  | 'elite'
+  | 'miniBoss'
+  | 'boss';
 export type BattleEffectKind = 'projectile' | 'laser' | 'aura';
 
 export interface BattleEnemy extends IEnemy {
@@ -50,6 +58,14 @@ export interface BattleState {
   towers: BattleTower[];
   enemies: BattleEnemy[];
   effects: BattleEffect[];
+  route: GridPoint[];
+  routeSeed: number;
+  routeLength: number;
+  routeTurns: number;
+  routeKind: RouteKind;
+  routeLabel: string;
+  routeThreatMultiplier: number;
+  routeRewardMultiplier: number;
   energy: number;
   baseHealth: number;
   wave: number;
