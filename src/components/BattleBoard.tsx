@@ -1,13 +1,16 @@
 import type { CSSProperties } from 'react';
+import { FUSION_COLORS } from '../config/fusionSystem';
 import { BOARD_COLUMNS, BOARD_ROWS } from '../config/gameSettings';
 import {
   getEntityPosition,
   getPathPosition,
   PATH_CELL_KEYS,
 } from '../game/battleGeometry';
-import { canFuseTowers } from '../game/fusionLogic';
-import { getCompositionSegments } from '../game/fusionLogic';
-import { FUSION_COLORS } from '../config/fusionSystem';
+import {
+  canFuseTowers,
+  getCompositionSegments,
+  getFusionCost,
+} from '../game/fusionLogic';
 import type { BattleDispatch, BattleState } from '../types/Battle';
 
 interface BattleBoardProps {
@@ -26,31 +29,57 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
   const fusionSourceTower = state.towers.find(
     (tower) => tower.instanceId === state.fusionSourceTowerId,
   );
+  const fusionTargets = fusionSourceTower
+    ? state.towers.filter((tower) => canFuseTowers(fusionSourceTower, tower))
+    : [];
 
   return (
     <div className="battle-board" style={boardStyle}>
+      {fusionSourceTower && (
+        <div className="fusion-board-guide" role="status">
+          <strong>Слияние: шаг 2 из 2</strong>
+          <span>
+            Нажмите на подсвеченную башню. Цена указана рядом с каждой целью.
+          </span>
+        </div>
+      )}
+
       {Array.from({ length: BOARD_COLUMNS * BOARD_ROWS }, (_, index) => {
         const x = index % BOARD_COLUMNS;
         const y = Math.floor(index / BOARD_COLUMNS);
         const isPathCell = PATH_CELL_KEYS.has(`${x}:${y}`);
-        const occupiedTower = state.towers.find((tower) => tower.x === x && tower.y === y);
+        const occupiedTower = state.towers.find(
+          (tower) => tower.x === x && tower.y === y,
+        );
         const isFusionTarget = Boolean(
           fusionSourceTower &&
           occupiedTower &&
           fusionSourceTower.instanceId !== occupiedTower.instanceId &&
           canFuseTowers(fusionSourceTower, occupiedTower),
         );
+        const fusionCost = isFusionTarget && fusionSourceTower && occupiedTower
+          ? getFusionCost(fusionSourceTower, occupiedTower)
+          : null;
+        const isAffordable = fusionCost !== null && fusionCost <= state.energy;
 
         return (
           <button
-            className={`board-cell${isPathCell ? ' board-cell--path' : ''}${occupiedTower ? ' board-cell--occupied' : ''}${isFusionTarget ? ' board-cell--fusion-target' : ''}`}
-            disabled={isPathCell || state.status === 'victory' || state.status === 'defeat'}
+            className={`board-cell${isPathCell ? ' board-cell--path' : ''}${occupiedTower ? ' board-cell--occupied' : ''}${isFusionTarget ? ' board-cell--fusion-target' : ''}${isFusionTarget && !isAffordable ? ' board-cell--fusion-unaffordable' : ''}`}
+            disabled={
+              isPathCell ||
+              state.status === 'victory' ||
+              state.status === 'defeat'
+            }
             key={`${x}:${y}`}
             onClick={() => dispatch({ type: 'PLACE_TOWER', x, y })}
             type="button"
             aria-label={
               occupiedTower
-                ? `${occupiedTower.name}, клетка ${x + 1}:${y + 1}`
+                ? `${occupiedTower.name}, клетка ${x + 1}:${y + 1}${
+                    fusionCost !== null
+                      ? `, слияние стоит ${fusionCost} энергии`
+                      : ''
+                  }`
                 : isPathCell
                   ? `Дорога, клетка ${x + 1}:${y + 1}`
                   : `Свободная клетка ${x + 1}:${y + 1}`
@@ -99,6 +128,24 @@ export function BattleBoard({ state, dispatch }: BattleBoardProps) {
               ))}
             </span>
           </div>
+        );
+      })}
+
+      {fusionSourceTower && fusionTargets.map((target) => {
+        const cost = getFusionCost(fusionSourceTower, target);
+        const isAffordable = cost <= state.energy;
+
+        return (
+          <span
+            aria-hidden="true"
+            className={`fusion-cost-badge${
+              isAffordable ? '' : ' fusion-cost-badge--insufficient'
+            }`}
+            key={`fusion-cost-${target.instanceId}`}
+            style={getEntityPosition(target.x, target.y)}
+          >
+            {cost} ⚡
+          </span>
         );
       })}
 
