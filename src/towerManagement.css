@@ -10,6 +10,24 @@
   top: auto;
 }
 
+.battle-board:not(.battle-board--placing) .board-cell:not(.board-cell--path) {
+  cursor: default;
+}
+
+.battle-board--placing .board-cell:not(.board-cell--path):not(.board-cell--occupied) {
+  cursor: crosshair;
+}
+
+.board-cell--occupied,
+.battle-board--placing .board-cell--occupied {
+  cursor: pointer;
+}
+
+.board-cell--occupied:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.26);
+}
+
 .tower-range {
   position: absolute;
   z-index: 3;
@@ -23,19 +41,20 @@
 
 .placed-tower {
   padding: 0;
-  pointer-events: auto;
-  cursor: pointer;
-  transition: transform 140ms ease, outline-color 140ms ease;
-}
-
-.placed-tower:hover {
-  transform: translate(-50%, -50%) scale(1.08);
+  pointer-events: none;
+  transition: outline-color 140ms ease;
 }
 
 .placed-tower--selected {
   z-index: 6;
   outline: 3px solid rgba(255, 255, 255, 0.9);
   outline-offset: 3px;
+}
+
+.selection-note--active {
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #e9e4ff;
+  background: rgba(124, 92, 191, 0.16);
 }
 
 .tower-inspector {
