@@ -23,11 +23,11 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
   if (!tower) {
     return (
       <aside className="tower-inspector" aria-label="Выбранная башня">
-        <p className="eyebrow">Установленная башня</p>
+        <p className="eyebrow">Слияние и башня</p>
         <h2>Башня не выбрана</h2>
         <p className="tower-inspector__empty">
-          Нажмите на занятую клетку поля, чтобы увидеть состав, радиус,
-          способности и действия башни.
+          Магазин остаётся доступен выше. Нажмите на установленную башню, чтобы
+          увидеть состав, радиус, перезарядку, способности и цену слияния.
         </p>
       </aside>
     );
@@ -49,7 +49,7 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
     : null;
   const affordableTargets = fusionCosts.filter((cost) => cost <= state.energy).length;
   const attackRate = (1000 / tower.cooldown).toFixed(2);
-  const targetsLabel = tower.targetCount >= 99
+  const targetsLabel = tower.attackType === 'aura' || tower.targetCount >= 99
     ? 'Все в радиусе'
     : `${tower.targetCount}`;
 
@@ -63,7 +63,7 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
           {tower.symbol}
         </span>
         <div>
-          <p className="eyebrow">Установленная башня</p>
+          <p className="eyebrow">Слияние и башня</p>
           <h2>{tower.name}</h2>
           <span className={`tower-level ${rarity.cssClass}`}>
             Ранг {tower.level} · {rarity.label}
@@ -232,13 +232,13 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
           onClick={() => dispatch({ type: 'CLEAR_SELECTION' })}
           type="button"
         >
-          Назад к арсеналу
+          Снять выделение
         </button>
       </div>
 
       <p className="tower-inspector__note">
         Чем реже цветовой состав, тем дороже следующее слияние. Все варианты и
-        точные параметры доступны в атласе.
+        точные параметры постоянно видны в атласе слева.
       </p>
     </aside>
   );
