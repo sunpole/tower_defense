@@ -4,6 +4,7 @@ import { useBattleLoop } from '../hooks/useBattleLoop';
 import { BattleBoard } from './BattleBoard';
 import { BattleControls } from './BattleControls';
 import { BattleHeader } from './BattleHeader';
+import { TowerInspector } from './TowerInspector';
 import { TowerShop } from './TowerShop';
 
 export function Battle() {
@@ -13,6 +14,10 @@ export function Battle() {
   );
 
   useBattleLoop(dispatch);
+
+  const selectedPlacedTower = state.towers.find(
+    (tower) => tower.instanceId === state.selectedPlacedTowerId,
+  ) ?? null;
 
   return (
     <main className="game-app">
@@ -24,10 +29,17 @@ export function Battle() {
           <BattleControls state={state} dispatch={dispatch} />
         </section>
 
-        <TowerShop
-          selectedTowerId={state.selectedTowerId}
-          dispatch={dispatch}
-        />
+        <div className="game-sidebar">
+          <TowerShop
+            selectedTowerId={state.selectedTowerId}
+            dispatch={dispatch}
+          />
+          <TowerInspector
+            tower={selectedPlacedTower}
+            energy={state.energy}
+            dispatch={dispatch}
+          />
+        </div>
       </div>
     </main>
   );
