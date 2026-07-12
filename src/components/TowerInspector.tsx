@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FUSION_COLORS, FUSION_RARITIES } from '../config/fusionSystem';
 import {
   canFuseTowers,
@@ -20,15 +21,19 @@ interface TowerInspectorProps {
 }
 
 export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) {
+  const [saleConfirmTowerId, setSaleConfirmTowerId] = useState<string | null>(null);
+
   if (!tower) {
     return (
-      <aside className="tower-inspector" aria-label="Выбранная башня">
-        <p className="eyebrow">Слияние и башня</p>
-        <h2>Башня не выбрана</h2>
-        <p className="tower-inspector__empty">
-          Магазин остаётся доступен выше. Нажмите на установленную башню, чтобы
-          увидеть состав, радиус, перезарядку, способности и цену слияния.
-        </p>
+      <aside className="tower-inspector tower-inspector--empty" aria-label="Выбранная башня">
+        <div className="tower-inspector__empty-icon" aria-hidden="true">◎</div>
+        <div>
+          <p className="eyebrow">Синтез</p>
+          <h2>Выберите башню</h2>
+          <p className="tower-inspector__empty">
+            Нажмите на башню на поле: здесь появятся характеристики, способности и слияние.
+          </p>
+        </div>
       </aside>
     );
   }
@@ -36,6 +41,7 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
   const abilities = getActiveFusionAbilities(tower.composition);
   const rarity = FUSION_RARITIES[tower.fusionRarity];
   const segments = getCompositionSegments(tower.composition);
+  const compositionEntries = getCompositionEntries(tower.composition);
   const isFusionSource = state.fusionSourceTowerId === tower.instanceId;
   const compatibleTargets = state.towers.filter((candidate) =>
     canFuseTowers(tower, candidate),
@@ -50,28 +56,51 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
   const affordableTargets = fusionCosts.filter((cost) => cost <= state.energy).length;
   const attackRate = (1000 / tower.cooldown).toFixed(2);
   const targetsLabel = tower.attackType === 'aura' || tower.targetCount >= 99
-    ? 'Все в радиусе'
+    ? 'Все'
     : `${tower.targetCount}`;
+  const saleValue = Math.floor(tower.investedEnergy * 0.6);
+  const isConfirmingSale = saleConfirmTowerId === tower.instanceId;
+  const hasCompatibleTargets = compatibleTargets.length > 0;
+  const canAffordAnyFusion = affordableTargets > 0;
+
+  const clearSelection = () => {
+    setSaleConfirmTowerId(null);
+    dispatch({ type: 'CLEAR_SELECTION' });
+  };
+
+  const confirmSale = () => {
+    setSaleConfirmTowerId(null);
+    dispatch({ type: 'SELL_SELECTED_TOWER' });
+  };
 
   return (
-    <aside className="tower-inspector" aria-label="Выбранная башня">
-      <div className="tower-inspector__heading">
+    <aside className="tower-inspector tower-inspector--compact" aria-label="Выбранная башня">
+      <div className="tower-inspector__heading tower-inspector__heading--compact">
         <span
           className="tower-inspector__symbol"
           style={{ borderColor: tower.color, color: tower.color }}
         >
           {tower.symbol}
         </span>
-        <div>
-          <p className="eyebrow">Слияние и башня</p>
+        <div className="tower-inspector__identity">
+          <p className="eyebrow">Синтез и башня</p>
           <h2>{tower.name}</h2>
           <span className={`tower-level ${rarity.cssClass}`}>
             Ранг {tower.level} · {rarity.label}
           </span>
         </div>
+        <button
+          aria-label="Снять выделение с башни"
+          className="tower-inspector__close"
+          onClick={clearSelection}
+          title="Снять выделение"
+          type="button"
+        >
+          ×
+        </button>
       </div>
 
-      <div className="composition-bar" aria-label={getCompositionLabel(tower.composition)}>
+      <div className="composition-bar composition-bar--compact" aria-label={getCompositionLabel(tower.composition)}>
         {segments.map((colorId, index) => (
           <span
             key={`${colorId}-${index}`}
@@ -80,166 +109,137 @@ export function TowerInspector({ tower, state, dispatch }: TowerInspectorProps) 
         ))}
       </div>
 
-      <dl className="composition-list">
-        {getCompositionEntries(tower.composition).map((entry) => (
-          <div key={entry.colorId}>
-            <dt>{FUSION_COLORS[entry.colorId].label}</dt>
-            <dd>
-              {entry.value}/10 · {FUSION_COLORS[entry.colorId].primaryStatLabel}
-            </dd>
-          </div>
+      <div className="composition-pills" aria-label="Цветовой состав">
+        {compositionEntries.map((entry) => (
+          <span key={entry.colorId} style={{ '--composition-color': FUSION_COLORS[entry.colorId].hex } as React.CSSProperties}>
+            <b>{FUSION_COLORS[entry.colorId].label}</b>
+            {entry.value}/10
+          </span>
         ))}
+      </div>
+
+      <dl className="tower-details tower-details--compact">
+        <div><dt>Урон</dt><dd>{tower.damage}</dd></div>
+        <div><dt>Радиус</dt><dd>{tower.range}</dd></div>
+        <div><dt>Перезарядка</dt><dd>{(tower.cooldown / 1000).toFixed(2)}с</dd></div>
+        <div><dt>Атак/с</dt><dd>{attackRate}</dd></div>
+        <div><dt>Целей</dt><dd>{targetsLabel}</dd></div>
+        <div><dt>Вложено</dt><dd>{tower.investedEnergy} ⚡</dd></div>
       </dl>
 
-      <dl className="tower-details tower-details--extended">
-        <div>
-          <dt>Урон</dt>
-          <dd>{tower.damage}</dd>
+      <section className="ability-list ability-list--compact" aria-label="Активные способности">
+        <div className="compact-section-heading">
+          <strong>Способности</strong>
+          <span>{abilities.length || 'нет'}</span>
         </div>
-        <div>
-          <dt>Радиус</dt>
-          <dd>{tower.range}</dd>
-        </div>
-        <div>
-          <dt>Перезарядка</dt>
-          <dd>{(tower.cooldown / 1000).toFixed(2)} сек.</dd>
-        </div>
-        <div>
-          <dt>Атак в секунду</dt>
-          <dd>{attackRate}</dd>
-        </div>
-        <div>
-          <dt>Целей</dt>
-          <dd>{targetsLabel}</dd>
-        </div>
-        <div>
-          <dt>Вложено</dt>
-          <dd>{tower.investedEnergy}</dd>
-        </div>
-      </dl>
-
-      <div className="ability-list">
-        <strong>Активные способности</strong>
         {abilities.length > 0 ? (
           <ul>
             {abilities.map((ability) => (
-              <li key={ability.id}>
-                <span>{ability.name}</span>
-                <small>{ability.fullDescription}</small>
+              <li key={ability.id} title={ability.fullDescription}>
+                <div>
+                  <span>{ability.name}</span>
+                  <small>{ability.fullDescription}</small>
+                </div>
                 <em>{getAbilityExactEffect(ability.id)}</em>
               </li>
             ))}
           </ul>
         ) : (
-          <p>
-            Чистая башня. Соедините её с другим цветом, чтобы открыть
-            цветовую способность.
+          <p className="ability-list__empty">
+            Чистый цвет. Соедините с другой башней, чтобы открыть синергию.
           </p>
         )}
-      </div>
+      </section>
 
-      <div className="fusion-steps" aria-label="Как выполнить слияние">
-        <strong>Как выполнить слияние</strong>
-        <ol>
-          <li className="is-done">Исходная башня выбрана.</li>
-          <li className={isFusionSource ? 'is-done' : 'is-active'}>
-            Нажмите кнопку начала слияния.
-          </li>
-          <li className={isFusionSource ? 'is-active' : ''}>
-            Нажмите на подсвеченную башню. Цена будет написана прямо на поле.
-          </li>
-        </ol>
-      </div>
-
-      <div
-        className={`fusion-budget${
-          compatibleTargets.length > 0 && affordableTargets === 0
-            ? ' fusion-budget--insufficient'
-            : ''
-        }`}
-      >
-        {compatibleTargets.length > 0 && fusionCostRange ? (
-          <>
-            <div>
-              <span>Цена следующего слияния</span>
-              <strong>{fusionCostRange} энергии</strong>
-            </div>
-            <div>
-              <span>Ваш запас</span>
-              <strong>{state.energy} энергии</strong>
-            </div>
-            <p>
-              Совместимых башен: {compatibleTargets.length}. Сейчас доступно по
-              энергии: {affordableTargets}.
-            </p>
-            {minimumFusionCost !== null && state.energy < minimumFusionCost && (
-              <b>
-                Не хватает {minimumFusionCost - state.energy} энергии для самого
-                дешёвого слияния.
-              </b>
-            )}
-          </>
-        ) : (
-          <p>
-            Совместимых башен пока нет. Поставьте чистую башню другого цвета
-            или подходящий цвет для уже созданного гибрида.
-          </p>
-        )}
-      </div>
-
-      {isFusionSource && (
-        <div className="fusion-mode-notice" role="status">
-          <strong>Режим слияния включён</strong>
-          <span>
-            Совместимые башни подсвечены. Зелёная цена означает, что энергии
-            хватает; красная — что сначала нужно накопить энергию.
-          </span>
+      <section className={`fusion-console${isFusionSource ? ' fusion-console--active' : ''}${hasCompatibleTargets && !canAffordAnyFusion ? ' fusion-console--insufficient' : ''}`} aria-label="Управление слиянием">
+        <div className="compact-section-heading">
+          <strong>Слияние</strong>
+          <span>{compatibleTargets.length} совместимых</span>
         </div>
-      )}
 
-      <div className="tower-inspector__actions">
+        <div className="fusion-progress" aria-label="Этапы слияния">
+          <span className="is-done">1 · Башня</span>
+          <span className={isFusionSource ? 'is-done' : 'is-active'}>2 · Режим</span>
+          <span className={isFusionSource ? 'is-active' : ''}>3 · Цель</span>
+        </div>
+
+        <div className="fusion-console__metrics">
+          <div>
+            <span>Цена</span>
+            <strong>{fusionCostRange ? `${fusionCostRange} ⚡` : '—'}</strong>
+          </div>
+          <div>
+            <span>Энергия</span>
+            <strong>{state.energy} ⚡</strong>
+          </div>
+          <div>
+            <span>Доступно</span>
+            <strong>{affordableTargets}/{compatibleTargets.length}</strong>
+          </div>
+        </div>
+
+        <p className="fusion-console__message" role="status">
+          {isFusionSource
+            ? 'Выберите подсвеченную башню на поле. Цена указана рядом с целью.'
+            : hasCompatibleTargets
+              ? canAffordAnyFusion
+                ? 'Готово: включите режим и выберите цель на поле.'
+                : minimumFusionCost !== null
+                  ? `Нужно ещё ${minimumFusionCost - state.energy} энергии.`
+                  : 'Слияние пока недоступно.'
+              : 'Поставьте совместимый цвет рядом с дорогой.'}
+        </p>
+
         {isFusionSource ? (
           <button
-            className="tower-upgrade-button"
+            className="tower-upgrade-button tower-upgrade-button--compact"
             onClick={() => dispatch({ type: 'CANCEL_FUSION' })}
             type="button"
           >
-            Отменить слияние
+            Отменить режим слияния
           </button>
         ) : (
           <button
-            className="tower-upgrade-button"
-            disabled={compatibleTargets.length === 0}
+            className="tower-upgrade-button tower-upgrade-button--compact"
+            disabled={!hasCompatibleTargets}
             onClick={() => dispatch({ type: 'START_FUSION' })}
             type="button"
           >
-            {fusionCostRange
-              ? `Начать слияние · ${fusionCostRange} энергии`
-              : 'Нет совместимой башни'}
+            {fusionCostRange ? `Начать слияние · ${fusionCostRange} ⚡` : 'Нет совместимой башни'}
           </button>
         )}
+      </section>
 
-        <button
-          className="tower-sell-button"
-          onClick={() => dispatch({ type: 'SELL_SELECTED_TOWER' })}
-          type="button"
-        >
-          Продать за {Math.floor(tower.investedEnergy * 0.6)}
-        </button>
-
-        <button
-          className="tower-back-button"
-          onClick={() => dispatch({ type: 'CLEAR_SELECTION' })}
-          type="button"
-        >
-          Снять выделение
-        </button>
+      <div className={`tower-danger-zone${isConfirmingSale ? ' tower-danger-zone--confirming' : ''}`}>
+        {!isConfirmingSale ? (
+          <button
+            aria-expanded="false"
+            className="tower-danger-zone__trigger"
+            onClick={() => setSaleConfirmTowerId(tower.instanceId)}
+            type="button"
+          >
+            Продажа башни
+          </button>
+        ) : (
+          <>
+            <span>Продать за <strong>{saleValue} ⚡</strong>?</span>
+            <button
+              className="tower-danger-zone__cancel"
+              onClick={() => setSaleConfirmTowerId(null)}
+              type="button"
+            >
+              Отмена
+            </button>
+            <button
+              className="tower-danger-zone__confirm"
+              onClick={confirmSale}
+              type="button"
+            >
+              Подтвердить
+            </button>
+          </>
+        )}
       </div>
-
-      <p className="tower-inspector__note">
-        Чем реже цветовой состав, тем дороже следующее слияние. Все варианты и
-        точные параметры постоянно видны в атласе слева.
-      </p>
     </aside>
   );
 }
