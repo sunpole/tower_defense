@@ -1,12 +1,8 @@
-import { Shop } from './components/Shop';
+import { Battle } from './components/Battle';
 import './App.css';
 
 function App() {
-  return (
-    <div className="App">
-      <Shop />
-    </div>
-  );
+  return <Battle />;
 }
 
 export default App;
