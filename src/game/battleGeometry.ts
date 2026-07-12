@@ -1,20 +1,25 @@
 import {
-  BATTLE_PATH,
   BOARD_COLUMNS,
   BOARD_ROWS,
+  type GridPoint,
 } from '../config/gameSettings';
 import type { BattleEnemy, BattleTower } from '../types/Battle';
 
-export const PATH_CELL_KEYS = new Set(
-  BATTLE_PATH.map((point) => `${point.x}:${point.y}`),
-);
+export function getPathPosition(progress: number, path: readonly GridPoint[]) {
+  if (path.length === 0) {
+    return { x: 0, y: 0 };
+  }
 
-export function getPathPosition(progress: number) {
-  const finalIndex = BATTLE_PATH.length - 1;
-  const segmentIndex = Math.min(Math.floor(progress), finalIndex - 1);
-  const localProgress = progress - segmentIndex;
-  const start = BATTLE_PATH[segmentIndex];
-  const end = BATTLE_PATH[segmentIndex + 1];
+  if (path.length === 1) {
+    return path[0];
+  }
+
+  const finalIndex = path.length - 1;
+  const safeProgress = Math.max(0, Math.min(progress, finalIndex));
+  const segmentIndex = Math.min(Math.floor(safeProgress), finalIndex - 1);
+  const localProgress = safeProgress - segmentIndex;
+  const start = path[segmentIndex];
+  const end = path[segmentIndex + 1];
 
   return {
     x: start.x + (end.x - start.x) * localProgress,
@@ -25,8 +30,9 @@ export function getPathPosition(progress: number) {
 export function getDistance(
   tower: Pick<BattleTower, 'x' | 'y'>,
   enemy: BattleEnemy,
+  path: readonly GridPoint[],
 ) {
-  const position = getPathPosition(enemy.progress);
+  const position = getPathPosition(enemy.progress, path);
   return Math.hypot(tower.x - position.x, tower.y - position.y);
 }
 
