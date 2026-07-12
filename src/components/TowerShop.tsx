@@ -4,10 +4,15 @@ import type { BattleDispatch } from '../types/Battle';
 
 interface TowerShopProps {
   selectedTowerId: number;
+  placementMode: boolean;
   dispatch: BattleDispatch;
 }
 
-export function TowerShop({ selectedTowerId, dispatch }: TowerShopProps) {
+export function TowerShop({
+  selectedTowerId,
+  placementMode,
+  dispatch,
+}: TowerShopProps) {
   const selectedTower = TOWERS.find((tower) => tower.id === selectedTowerId);
 
   return (
@@ -19,11 +24,12 @@ export function TowerShop({ selectedTowerId, dispatch }: TowerShopProps) {
 
       <div className="tower-list">
         {TOWERS.map((tower) => {
-          const isSelected = tower.id === selectedTowerId;
+          const isReadyToPlace = placementMode && tower.id === selectedTowerId;
 
           return (
             <button
-              className={`tower-option${isSelected ? ' tower-option--selected' : ''}`}
+              aria-pressed={isReadyToPlace}
+              className={`tower-option${isReadyToPlace ? ' tower-option--selected' : ''}`}
               key={tower.id}
               onClick={() => dispatch({ type: 'SELECT_TOWER', towerId: tower.id })}
               style={{ '--tower-color': tower.color } as CSSProperties}
@@ -42,16 +48,22 @@ export function TowerShop({ selectedTowerId, dispatch }: TowerShopProps) {
         })}
       </div>
 
-      {selectedTower && (
-        <div className="selection-note">
-          Сейчас выбрана: <strong>{selectedTower.name}</strong>
-        </div>
-      )}
+      <div className={`selection-note${placementMode ? ' selection-note--active' : ''}`}>
+        {placementMode && selectedTower ? (
+          <>
+            В руке: <strong>{selectedTower.name}</strong>.
+            <br />
+            Нажмите на свободную клетку. Повторный клик по этой карточке отменит установку.
+          </>
+        ) : (
+          'Режим установки выключен. Нажмите на тип башни, чтобы взять её.'
+        )}
+      </div>
 
       <ol className="game-help">
-        <li>Выберите башню.</li>
-        <li>Нажмите на свободную клетку рядом с дорогой.</li>
-        <li>Запустите волну и не дайте врагам добраться до базы.</li>
+        <li>Нажмите на тип башни, затем на свободную клетку.</li>
+        <li>После установки режим автоматически выключится.</li>
+        <li>Нажмите на занятую клетку, чтобы выбрать установленную башню.</li>
       </ol>
     </aside>
   );
