@@ -36,8 +36,11 @@ export type BalanceAction =
 
 export type BalanceDispatch = Dispatch<BalanceAction>;
 
+let sessionSequence = 0;
+
 function createSessionId(routeSeed: number) {
-  return `${Date.now()}-${routeSeed}`;
+  sessionSequence += 1;
+  return `${Date.now()}-${routeSeed}-${sessionSequence}`;
 }
 
 export function createBalanceInitialState(
@@ -73,7 +76,7 @@ function mergeBaseState(
 function countDefeatedBosses(
   previous: BalanceBattleState,
   next: BattleState,
-  scaledDelta: number,
+  simulatedDelta: number,
 ) {
   const nextEnemyIds = new Set(next.enemies.map((enemy) => enemy.instanceId));
   let miniBossKills = 0;
@@ -88,13 +91,10 @@ function countDefeatedBosses(
     }
 
     const escaped =
-      enemy.progress + enemy.speed * (scaledDelta / 1000) >=
+      enemy.progress + enemy.speed * (simulatedDelta / 1000) >=
       previous.route.length - 1;
 
-    if (escaped) {
-      continue;
-    }
-
+    if (escaped) continue;
     if (enemy.archetype === 'miniBoss') miniBossKills += 1;
     if (enemy.archetype === 'boss') bossKills += 1;
   }
@@ -102,43 +102,64 @@ function countDefeatedBosses(
   return { miniBossKills, bossKills };
 }
 
+function startAutoWave(state: BalanceBattleState) {
+  const started = mergeBaseState(
+    state,
+    battleReducer(state, { type: 'START_WAVE' }),
+  );
+
+  return {
+    ...started,
+    message: `Автозапуск: началась волна ${started.wave}.`,
+  };
+}
+
 function runBalanceTick(
   state: BalanceBattleState,
   realDelta: number,
 ): BalanceBattleState {
-  if (state.isPaused || state.status !== 'running') {
-    return state;
+  if (state.isPaused || state.status !== 'running') return state;
+
+  let next = state;
+  let miniBossKills = state.miniBossKills;
+  let bossKills = state.bossKills;
+
+  for (let step = 0; step < state.gameSpeed; step += 1) {
+    if (next.status !== 'running') break;
+
+    const beforeStep = next;
+    const nextBase = battleReducer(next, {
+      type: 'TICK',
+      delta: realDelta,
+    });
+    const defeatedBosses = countDefeatedBosses(
+      beforeStep,
+      nextBase,
+      realDelta,
+    );
+
+    miniBossKills += defeatedBosses.miniBossKills;
+    bossKills += defeatedBosses.bossKills;
+    next = {
+      ...mergeBaseState(next, nextBase),
+      miniBossKills,
+      bossKills,
+    };
+
+    if (
+      beforeStep.status === 'running' &&
+      next.status === 'idle' &&
+      next.autoStart &&
+      next.wave < TOTAL_WAVES
+    ) {
+      next = startAutoWave(next);
+    }
   }
 
-  const scaledDelta = realDelta * state.gameSpeed;
-  const nextBase = battleReducer(state, {
-    type: 'TICK',
-    delta: scaledDelta,
-  });
-  const defeatedBosses = countDefeatedBosses(state, nextBase, scaledDelta);
-  let next = mergeBaseState(state, nextBase);
-
-  next = {
+  return {
     ...next,
     elapsedMs: state.elapsedMs + realDelta,
-    miniBossKills: state.miniBossKills + defeatedBosses.miniBossKills,
-    bossKills: state.bossKills + defeatedBosses.bossKills,
   };
-
-  if (
-    state.status === 'running' &&
-    next.status === 'idle' &&
-    next.autoStart &&
-    next.wave < TOTAL_WAVES
-  ) {
-    next = mergeBaseState(
-      next,
-      battleReducer(next, { type: 'START_WAVE' }),
-    );
-    next.message = `Автозапуск: началась волна ${next.wave}.`;
-  }
-
-  return next;
 }
 
 export function balanceLabReducer(
@@ -217,7 +238,6 @@ export function balanceLabReducer(
         action.type === 'PLACE_TOWER' &&
         next.towers.length > state.towers.length;
       const fusionSucceeded =
-        action.type === 'FUSE_WITH_TOWER' &&
         next.towers.length < state.towers.length &&
         next.energy < state.energy;
 
