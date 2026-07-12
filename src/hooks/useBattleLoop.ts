@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { TICK_MS } from '../config/gameSettings';
-import type { BattleDispatch } from '../types/Battle';
+import type { BalanceDispatch } from '../game/balanceLab';
 
-export function useBattleLoop(dispatch: BattleDispatch) {
+export function useBattleLoop(dispatch: BalanceDispatch) {
   useEffect(() => {
     const timer = window.setInterval(() => {
-      dispatch({ type: 'TICK', delta: TICK_MS });
+      dispatch({ type: 'BALANCE_TICK', realDelta: TICK_MS });
     }, TICK_MS);
 
     return () => window.clearInterval(timer);
