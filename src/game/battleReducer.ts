@@ -27,6 +27,7 @@ export function createInitialBattleState(
 ): BattleState {
   return {
     selectedTowerId,
+    placementMode: false,
     selectedPlacedTowerId: null,
     towers: [],
     enemies: [],
@@ -37,7 +38,7 @@ export function createInitialBattleState(
     spawnRemaining: 0,
     spawnCooldown: 0,
     kills: 0,
-    message: 'Выберите башню, поставьте её рядом с дорогой и запустите волну.',
+    message: 'Выберите тип башни в арсенале, затем нажмите на свободную клетку.',
   };
 }
 
@@ -46,13 +47,26 @@ export function battleReducer(
   action: BattleAction,
 ): BattleState {
   switch (action.type) {
-    case 'SELECT_TOWER':
+    case 'SELECT_TOWER': {
+      const isCancellingPlacement =
+        state.placementMode && state.selectedTowerId === action.towerId;
+
+      if (isCancellingPlacement) {
+        return {
+          ...state,
+          placementMode: false,
+          message: 'Установка отменена. Выберите башню на поле или тип в арсенале.',
+        };
+      }
+
       return {
         ...state,
         selectedTowerId: action.towerId,
+        placementMode: true,
         selectedPlacedTowerId: null,
-        message: 'Башня выбрана. Нажмите на свободную клетку поля.',
+        message: 'Башня взята для установки. Нажмите на свободную клетку поля.',
       };
+    }
 
     case 'SELECT_PLACED_TOWER': {
       const tower = state.towers.find(
@@ -65,14 +79,31 @@ export function battleReducer(
 
       return {
         ...state,
+        placementMode: false,
         selectedPlacedTowerId: tower.instanceId,
         message: `${tower.name}, уровень ${tower.level}. Доступны улучшение и продажа.`,
       };
     }
 
+    case 'CLEAR_SELECTION':
+      return {
+        ...state,
+        placementMode: false,
+        selectedPlacedTowerId: null,
+        message: 'Ничего не выбрано. Выберите башню на поле или тип в арсенале.',
+      };
+
     case 'PLACE_TOWER': {
       if (state.status === 'victory' || state.status === 'defeat') {
         return state;
+      }
+
+      if (!state.placementMode) {
+        return {
+          ...state,
+          selectedPlacedTowerId: null,
+          message: 'Сначала выберите тип башни в арсенале.',
+        };
       }
 
       if (PATH_CELL_KEYS.has(`${action.x}:${action.y}`)) {
@@ -112,9 +143,10 @@ export function battleReducer(
       return {
         ...state,
         towers: [...state.towers, tower],
+        placementMode: false,
         selectedPlacedTowerId: instanceId,
         energy: state.energy - towerTemplate.placeCost,
-        message: `${towerTemplate.name} установлена и выбрана.`,
+        message: `${towerTemplate.name} установлена и выбрана. Режим установки выключен.`,
       };
     }
 
@@ -169,6 +201,7 @@ export function battleReducer(
           (tower) => tower.instanceId !== selectedTower.instanceId,
         ),
         selectedPlacedTowerId: null,
+        placementMode: false,
         energy: state.energy + refund,
         message: `${selectedTower.name} продана. Возвращено ${refund} энергии.`,
       };
