@@ -33,6 +33,7 @@ export function Battle() {
         <div className="game-sidebar">
           <TowerShop
             selectedTowerId={state.selectedTowerId}
+            placementMode={state.placementMode}
             dispatch={dispatch}
           />
           <TowerInspector
