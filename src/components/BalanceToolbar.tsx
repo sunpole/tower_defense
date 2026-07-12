@@ -5,6 +5,7 @@ import type {
   BalanceDispatch,
   GameSpeed,
 } from '../game/balanceLab';
+import { AudioControls } from './AudioControls';
 
 interface BalanceToolbarProps {
   state: BalanceBattleState;
@@ -58,6 +59,8 @@ export function BalanceToolbar({
         >
           Автоволны: {state.autoStart ? 'вкл.' : 'выкл.'}
         </button>
+
+        <AudioControls />
 
         <span className="balance-toolbar__time">
           Темп: ×{state.gameSpeed}{state.isPaused ? ' · пауза' : ''}

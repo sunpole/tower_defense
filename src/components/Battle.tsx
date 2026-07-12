@@ -16,6 +16,7 @@ import {
   recordBalanceSession,
   subscribeBalanceProfile,
 } from '../game/gameStats';
+import { useBattleAudio } from '../hooks/useBattleAudio';
 import { useBattleLoop } from '../hooks/useBattleLoop';
 import type { BattleDispatch } from '../types/Battle';
 import { BalanceToolbar } from './BalanceToolbar';
@@ -53,6 +54,7 @@ export function Battle() {
   }, [state]);
 
   useBattleLoop(balanceDispatch);
+  useBattleAudio(state);
 
   useEffect(() => {
     if (!summary || recordedSessionRef.current === summary.sessionId) return;
